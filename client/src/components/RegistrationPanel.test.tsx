@@ -7,7 +7,8 @@ import type { RegistrationView } from '../api/registrations';
 
 const OWNER_VIEW: RegistrationView = {
   event_id: 12, status: 'confirmed', registration_needed: true, registration_capacity: 3,
-  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
+  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z',
+  waiting_list_response_hours: 24, waiting_list: [], window: 'open',
   registered_count: 2, places_remaining: 1, contact_details_visible: true,
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
@@ -279,3 +280,56 @@ describe('RegistrationPanel settings (SG2-63)', () => {
     expect(form.queryByText(/extend registration/)).toBeNull();
   });
 });
+
+describe('RegistrationPanel waiting list (SG2-61, SG2-62 AC6)', () => {
+  const WAITING: RegistrationView = { ...OWNER_VIEW, places_remaining: 0, registered_count: 3, waiting_list_response_hours: 1, waiting_list: [
+    { entry_id: 5, name: 'Cara Waiting', organisation: null, status: 'offered', joined_at: '2030-06-03T02:00:00.000Z',
+      offer_expires_at: '2030-06-05T06:00:00.000Z', position: null },
+    { entry_id: 6, name: 'Dev Waiting', organisation: 'Guests Ltd', status: 'waiting', joined_at: '2030-06-03T03:00:00.000Z',
+      offer_expires_at: null, position: 1 },
+  ] };
+
+  test('[NORMAL] [SG2-61:AC7] [SG2-62:AC6] the organiser and coordinator see who is waiting in order, the place held for one, and the response window', async () => {
+    serve(() => Response.json(WAITING));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    const list = within(await panel().findByRole('list', { name: 'Waiting list' }));
+    const entries = list.getAllByRole('listitem');
+    expect(entries.map((entry) => entry.textContent)).toEqual([
+      expect.stringContaining('Cara WaitingPlace offered, held until'),
+      expect.stringContaining('Dev WaitingGuests LtdWaiting, number 1'),
+    ]);
+    expect(panel().getByTestId('waiting-count')).toHaveTextContent('2');
+    expect(panel().getByText('1 hour')).toBeVisible();
+  });
+
+  test('[BOUNDARY] [SG2-61:AC7] nobody waiting is said plainly', async () => {
+    serve(() => Response.json(OWNER_VIEW));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    expect(await panel().findByText('No one is on the waiting list.')).toBeVisible();
+    expect(panel().getByText('24 hours')).toBeVisible();
+  });
+
+  test('[NORMAL] [SG2-62:AC6] the creating organiser sets how long an offered place is held, sending only that', async () => {
+    const fetch = serve(() => Response.json(OWNER_VIEW), () => Response.json({ ...OWNER_VIEW, waiting_list_response_hours: 6 }));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    const form = within(await screen.findByRole('form', { name: 'Registration settings' }));
+    expect(form.getByLabelText('Hold an offered place for (hours)')).toHaveValue(24);
+    fireEvent.change(form.getByLabelText('Hold an offered place for (hours)'), { target: { value: '6' } });
+    fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
+    await form.findByText('Registration settings saved.');
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)![1]!.body))).toEqual({ waiting_list_response_hours: 6 });
+  });
+
+  test('[FAILURE] [SG2-62:AC6] a response window that is not whole hours from 1 to 168 is refused before sending', async () => {
+    const fetch = serve(() => Response.json(OWNER_VIEW));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    const form = within(await screen.findByRole('form', { name: 'Registration settings' }));
+    for (const hours of ['0', '169', '1.5', '']) {
+      fireEvent.change(form.getByLabelText('Hold an offered place for (hours)'), { target: { value: hours } });
+      fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
+      expect(form.getByRole('alert')).toHaveTextContent('The waiting-list response window must be a whole number of hours from 1 to 168.');
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+

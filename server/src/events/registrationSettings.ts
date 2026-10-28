@@ -5,11 +5,15 @@
  * must change together.
  */
 
-/** AC5: what the organiser sets. Registration needed stays an event detail. */
+/**
+ * AC5: what the organiser sets. Registration needed stays an event detail.
+ * SG2-62 AC6 adds the waiting-list response window.
+ */
 export const REGISTRATION_SETTING_FIELDS = [
   'registration_capacity',
   'registration_opens_at',
-  'registration_closes_at'
+  'registration_closes_at',
+  'waiting_list_response_hours'
 ] as const;
 export type RegistrationSettingField = (typeof REGISTRATION_SETTING_FIELDS)[number];
 
@@ -17,6 +21,8 @@ export interface RegistrationSettingValues {
   registration_capacity?: number | null;
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
+  /** Never cleared: it always has a value, 24 hours unless the organiser changed it. */
+  waiting_list_response_hours?: number;
 }
 
 export interface RegistrationSettings {
@@ -31,6 +37,11 @@ export type ValidateRegistrationSettingsResult =
 
 /** Matches the events.registration_capacity integer column. */
 const MAX_CAPACITY = 2_147_483_647;
+/**
+ * SG2-62 AC6: how long a place offered from the waiting list is held, in
+ * whole hours up to a week (team decision, 28 Oct 2026; PO to confirm).
+ */
+export const MAX_RESPONSE_HOURS = 168;
 
 /** Statuses whose registration can no longer change (AC5). */
 export const SETTLED_STATUSES = ['completed', 'cancelled', 'rejected'] as const;
@@ -73,6 +84,14 @@ export function validateRegistrationSettings(body: unknown): ValidateRegistratio
       errors.push(`registration_capacity must be a whole number from 1 to ${MAX_CAPACITY}.`);
     } else {
       values.registration_capacity = capacity;
+    }
+  }
+  if ('waiting_list_response_hours' in input) {
+    const hours = input.waiting_list_response_hours;
+    if (typeof hours !== 'number' || !Number.isInteger(hours) || hours < 1 || hours > MAX_RESPONSE_HOURS) {
+      errors.push(`waiting_list_response_hours must be a whole number of hours from 1 to ${MAX_RESPONSE_HOURS}.`);
+    } else {
+      values.waiting_list_response_hours = hours;
     }
   }
   for (const field of ['registration_opens_at', 'registration_closes_at'] as const) {

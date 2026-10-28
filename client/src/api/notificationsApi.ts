@@ -12,7 +12,9 @@ export interface Notification {
     | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested'
     | 'registration_withdrawn'
     | 'change_accepted' | 'change_refused'
-    | 'event_changed';
+    | 'event_changed'
+    // SG2-61 AC3: the event is full; SG2-62 AC6: a waiting-list place is offered, or the offer lapsed.
+    | 'registration_full' | 'waiting_list_offer' | 'waiting_list_offer_lapsed';
   message: string;
   created_at: string;
 }

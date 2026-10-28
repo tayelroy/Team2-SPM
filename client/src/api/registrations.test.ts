@@ -3,7 +3,8 @@ import { closeRegistrationNow, fetchRegistrations, readRegistrationView, saveReg
 
 const VIEW: RegistrationView = {
   event_id: 12, status: 'confirmed', registration_needed: true, registration_capacity: 3,
-  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
+  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z',
+  waiting_list_response_hours: 24, waiting_list: [], window: 'open',
   registered_count: 1, places_remaining: 2, contact_details_visible: true,
   attendees: [{ registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
     email: 'ana@attendee.test', phone: null, needs: 'Step-free access' }],
@@ -19,6 +20,23 @@ const stub = (reply: () => Promise<Response> | Response) => {
   vi.stubGlobal('fetch', fetch);
   return fetch;
 };
+
+describe('readRegistrationView waiting list (SG2-61)', () => {
+  const entry = { entry_id: 5, name: 'Cara', organisation: null, status: 'offered', joined_at: 'j', offer_expires_at: 'x', position: null };
+  test('[NORMAL] [SG2-61:AC7] a waiting list is read as sent', () => {
+    const view = { ...VIEW, waiting_list: [entry, { ...entry, entry_id: 6, status: 'waiting', offer_expires_at: null, position: 1 }] };
+    expect(readRegistrationView(view)).toEqual(view);
+  });
+  test('[FAILURE] [SG2-61:AC7] a malformed list or response window is not a picture', () => {
+    for (const view of [{ ...VIEW, waiting_list: null }, { ...VIEW, waiting_list: [null] }, { ...VIEW, waiting_list: [{ ...entry, status: 'gone' }] },
+      { ...VIEW, waiting_list: [{ ...entry, entry_id: '5' }] }, { ...VIEW, waiting_list: [{ ...entry, position: '1' }] },
+      { ...VIEW, waiting_list: [{ ...entry, joined_at: 1 }] }, { ...VIEW, waiting_list: [{ ...entry, name: null }] },
+      { ...VIEW, waiting_list: [{ ...entry, organisation: 1 }] }, { ...VIEW, waiting_list: [{ ...entry, offer_expires_at: 1 }] },
+      { ...VIEW, waiting_list_response_hours: '24' }]) {
+      expect(readRegistrationView(view)).toBeNull();
+    }
+  });
+});
 
 describe('readRegistrationView (SG2-63)', () => {
   test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] a complete picture is read as sent, with or without contact details', () => {

@@ -280,6 +280,19 @@ Migration `202610260003_registration_withdrawal.sql`; tests
 `supabase/tests/registration_withdrawal.sql` (other-roles-refused, grants,
 not-mine) and browser journey `SG2-62-N01`.
 
+**Waiting list (SG2-61).** Joining and leaving reuse `events.register`
+(Attendees only). `join_waiting_list()` and `leave_waiting_list()` run with
+the caller's JWT, recheck the acting role with `lock_acting_role()` and act on
+the caller's own entry only; both are executable by `authenticated` only. The
+table `waiting_list_entries` has RLS forced and no grants to `anon` or
+`authenticated`. The organiser and coordinator see the list through SG2-63's
+picture, with SG2-63's access rules; the response window is one of the
+creating organiser's registration settings. `process_waiting_list_offers()`
+is `service_role` only; the internal helpers are executable by no API role.
+Migration `202610280001_waiting_list.sql`; tests
+`supabase/tests/waiting_list.sql` (other-roles-refused, grants) and browser
+journey `SG2-61-N01`.
+
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
 `202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.

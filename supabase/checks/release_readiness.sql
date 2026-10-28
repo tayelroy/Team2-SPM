@@ -7,9 +7,10 @@ do $readiness$
 declare
   failures text[];
   reminder_job_ready boolean;
+  waiting_list_job_ready boolean;
 begin
   with required_columns(relation, columns) as (values
-    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,waiting_list_response_hours,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
@@ -24,7 +25,9 @@ begin
     ('venue_booking_requests', 'request_id,event_id,venue_id,status,venue_booking_id,replaces_booking_id'),
     ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details'),
     -- SG2-65: who decided a change request, when and why.
-    ('event_change_requests', 'change_request_id,event_id,requested_by,field,from_value,to_value,reason,status,created_at,decided_by,decided_at,decision_reason')
+    ('event_change_requests', 'change_request_id,event_id,requested_by,field,from_value,to_value,reason,status,created_at,decided_by,decided_at,decision_reason'),
+    -- SG2-61: the waiting list for a full event.
+    ('waiting_list_entries', 'entry_id,event_id,attendee_id,status,joined_at,offered_at,offer_expires_at,ended_at')
   ), column_checks as (
     select 'column public.' || r.relation || '.' || col.name as name,
       exists (select 1 from pg_attribute a
@@ -113,6 +116,10 @@ begin
     ('public.raise_event_change_request(integer,uuid,text,jsonb,text)'),
     -- SG2-65: the coordinator accepts or refuses a change request.
     ('public.decide_event_change_request(integer,bigint,uuid,text,text,text)'),
+    -- SG2-61: the waiting list, and SG2-62 AC6's offers from it.
+    ('public.join_waiting_list(integer)'), ('public.leave_waiting_list(integer)'),
+    ('public.process_waiting_list_offers()'), ('private.offer_waiting_places(integer)'),
+    ('private.places_held(integer,uuid)'),
     -- SG2-102: registered attendees are told when their event changes.
     ('private.announce_event_attendee_details(integer)'), ('private.event_attendee_details_changed()')
   ), function_checks as (
@@ -163,7 +170,9 @@ begin
       exists(select 1 from pg_attribute a where a.attrelid=to_regclass('public.'||r.relation)
         and a.attname=r.column_name and not a.attisdropped and a.atttypid=to_regtype(r.type_name)) as passed
     from inbox_column_types r
-  ), inbox_private_relations(relation) as (values('notification_reminder_settings'),('notification_reminder_receipts')),
+  ), inbox_private_relations(relation) as (values('notification_reminder_settings'),('notification_reminder_receipts'),
+    -- SG2-61: attendees reach the waiting list only through its functions.
+    ('waiting_list_entries')),
   inbox_table_checks as (
     select 'notification private RLS and grants public.' || relation as name,
       coalesce(c.relrowsecurity and c.relforcerowsecurity
@@ -243,6 +252,8 @@ begin
     ('registration_withdrawn'),
     -- SG2-64/SG2-65: a change is requested, accepted or refused.
     ('change_requested'), ('change_accepted'), ('change_refused'),
+    -- SG2-61: the event is full; SG2-62 AC6: a waiting-list offer and its lapse.
+    ('registration_full'), ('waiting_list_offer'), ('waiting_list_offer_lapsed'),
     -- SG2-102: attendees hear their event's date, time or venue changed.
     ('event_changed')
   ), notification_constraint as (
@@ -299,6 +310,13 @@ begin
       into reminder_job_ready;
     if not coalesce(reminder_job_ready,false) then
       raise exception 'Release schema readiness failed: SG2-69 hourly reminder cron job missing or inactive';
+    end if;
+    -- SG2-61 / SG2-62 AC6: lapsed waiting-list offers pass to the next attendee every minute.
+    execute $cron$ select exists(select 1 from cron.job where jobname='waiting-list-offers'
+      and schedule='* * * * *' and active and command='select public.process_waiting_list_offers();') $cron$
+      into waiting_list_job_ready;
+    if not coalesce(waiting_list_job_ready,false) then
+      raise exception 'Release schema readiness failed: SG2-61 waiting-list offer cron job missing or inactive';
     end if;
   end if;
 

@@ -5,6 +5,7 @@ import type {
 } from '../../server/src/db/registrations';
 import { eventLabel } from '../../server/src/db/eventNotifications';
 import { accounts, type MemoryDatabase } from './memory-database';
+import { offerWaitingPlaces } from './registrable-events';
 
 type Row = Record<string, unknown>;
 
@@ -41,14 +42,24 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
       .filter(row => row.event_id === eventId && ['pending', 'approved'].includes(String(row.status))).map(row => row.venue_id));
     const venues = database.tables.venues.filter(row => venueIds.has(row.venue_id))
       .map(row => ({ venue_id: Number(row.venue_id), name: String(row.name), capacity: (row.capacity as number | null) ?? null }));
+    // SG2-61 AC7: the waiting list in the order attendees joined it.
+    const waitingList = database.tables.waiting_list_entries
+      .filter(row => row.event_id === eventId && (row.status === 'waiting' || row.status === 'offered'))
+      .sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)) || Number(a.entry_id) - Number(b.entry_id))
+      .map(row => {
+        const user = users.find(candidate => candidate.user_id === row.attendee_id)!;
+        return { entry_id: Number(row.entry_id), name: String(user.name), organisation: (user.organisation as string | null) ?? null,
+          status: row.status as 'waiting' | 'offered', joined_at: String(row.joined_at), offer_expires_at: (row.offer_expires_at as string | null) ?? null };
+      });
     return { ok: true, overview: { event: {
       event_id: eventId, name: (event.name as string | null) ?? null, status: String(event.status),
       organisation: (event.organisation as string | null) ?? null, organiser_id: (event.organiser_id as string | null) ?? null,
       coordinator_id: (event.coordinator_id as string | null) ?? null, proposed_date: iso(event.proposed_date),
       registration_needed: (event.registration_needed as boolean | null) ?? null,
       registration_capacity: (event.registration_capacity as number | null) ?? null,
-      registration_opens_at: iso(event.registration_opens_at), registration_closes_at: iso(event.registration_closes_at)
-    }, attendees, venues } };
+      registration_opens_at: iso(event.registration_opens_at), registration_closes_at: iso(event.registration_closes_at),
+      waiting_list_response_hours: typeof event.waiting_list_response_hours === 'number' ? event.waiting_list_response_hours : 24
+    }, attendees, waiting_list: waitingList, venues } };
   };
 
   const announce = (event: Row, closedEarly: boolean) => {
@@ -83,6 +94,7 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
     const now = Date.now();
     if (time(event.proposed_date) !== null && now >= time(event.proposed_date)!) return { outcome: 'started' };
     const next = {
+      waiting_list_response_hours: typeof event.waiting_list_response_hours === 'number' ? event.waiting_list_response_hours : 24,
       registration_capacity: (event.registration_capacity as number | null) ?? null,
       registration_opens_at: iso(event.registration_opens_at),
       registration_closes_at: iso(event.registration_closes_at)
@@ -100,8 +112,9 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
       if (next.registration_capacity !== null && next.registration_capacity < registered) return { outcome: 'below_registered', registered };
     }
     const logs = database.tables.event_audit_logs;
-    for (const field of ['registration_capacity', 'registration_opens_at', 'registration_closes_at'] as const) {
-      const before = field === 'registration_capacity' ? event[field] ?? null : iso(event[field]);
+    for (const field of ['registration_capacity', 'registration_opens_at', 'registration_closes_at', 'waiting_list_response_hours'] as const) {
+      const before = field === 'registration_capacity' ? event[field] ?? null
+        : field === 'waiting_list_response_hours' ? event[field] ?? 24 : iso(event[field]);
       if (String(before) === String(next[field])) continue;
       logs.push({ log_id: nextId(logs, 'log_id'), event_id: input.eventId, actor_id: input.actorId, field_name: field,
         old_value: before === null ? null : String(before), new_value: next[field] === null ? null : String(next[field]),
@@ -109,6 +122,8 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
     }
     Object.assign(event, next);
     announce(event, input.closeNow);
+    // SG2-62 AC6: places a higher capacity frees go to the waiting list first.
+    offerWaitingPlaces(database, event);
     return { outcome: 'ok' };
   };
 

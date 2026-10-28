@@ -26,7 +26,9 @@ function fixture(role: Role = 'attendee', result: RegisterResult | (() => Promis
       register: async (eventId, input) => {
         asked.push([eventId, input]);
         return typeof result === 'function' ? result() : result;
-      }
+      },
+      joinWaitingList: async () => assert.fail('Registering never joins a waiting list'),
+      leaveWaitingList: async () => assert.fail('Registering never leaves a waiting list')
     };
   };
   const router = createRegistrableEventsRouter(access, store);

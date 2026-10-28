@@ -143,7 +143,7 @@ test('[FAILURE] [SG2-59:AC1] a refused list explains it, and an unavailable list
 test('[BOUNDARY] [SG2-59:AC1] registration counts as open from its opening time on', () => {
   const event: RegistrableEvent = {
     eventId: 1, name: 'x', organisation: null, category: null, description: null, proposedDate: null,
-    registrationOpensAt: '2030-06-01T00:00:00.000Z', registrationClosesAt: '2030-06-25T00:00:00.000Z', venues: [], registered: false,
+    registrationOpensAt: '2030-06-01T00:00:00.000Z', registrationClosesAt: '2030-06-25T00:00:00.000Z', venues: [], registered: false, full: false, waiting: null,
   };
   const opens = Date.parse('2030-06-01T00:00:00.000Z');
   expect(registrationState(event, opens - 1)).toEqual({ label: 'Opening soon', when: 'Opens 1 Jun 2030, 8:00 am', open: false });

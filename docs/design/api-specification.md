@@ -1138,6 +1138,15 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **200:** `{ withdrawal: { registration_id, event_id, withdrawn_at } }`. The registration is stored as `cancelled` with `withdrawn_at`, giving its place back, and the organiser and the assigned coordinator are each sent a `registration_withdrawn` notification.
 - **Errors:** 400 `registrationId must be a positive integer.`; 404 `This registration was not found.` for one that is not the caller's or does not exist; 409 `{ error, reason }` with `reason` `withdrawn` (`You have already withdrawn from this event.`), `cancelled` (`This event has been cancelled.`) or `started` (`This event started 20 Jul 2030 19:00 SGT, so you can no longer withdraw.`, with `proposed_date`; also for a completed event); 401/403/503 as 9B.4. Checked in that order. Registration having closed does not stop a withdrawal.
 
+### 9B.6 POST and DELETE /api/registrable-events/:eventId/waiting-list (SG2-61)
+- **Source:** `registrableEvents/index.ts`, `db/registrableEvents.ts` (`joinWaitingList`, `leaveWaitingList`), migration `202610280001_waiting_list.sql` (`join_waiting_list`, `leave_waiting_list`).
+- **Permission:** `events.register` (Attendee): joining the list is how an attendee registers for a full event. Both functions run with the caller's JWT, recheck the acting role with `lock_acting_role()` and lock the event row first, as 9B.3 does.
+- **POST 201:** `{ waiting: { status: 'waiting', position, joined_at } }` (position 1 is next). Only a full event that is open for registration takes joins.
+- **POST errors:** 400 for a bad event id; 404 as 9B.3; 409 `{ error, reason }` with `reason` `already` (`You are already on the waiting list for this event.`, with `waiting`: the position, or `{ status: 'offered', offer_expires_at, joined_at }`), `registered` (`You are already registered for this event.`), `not_full` (`Places are still available. Register instead.`), `not_open` or `closed` (as 9B.3); 401/403/503 as 9B.1.
+- **DELETE 200:** `{ left: true }`, at any time. A place held for the caller passes to the next attendee. **404** `You are not on the waiting list for this event.`
+- **9B.1/9B.2** also return `full` (every place is held by a registration or someone else's running offer) and `waiting` (the caller's standing on the list, or null). **9B.3** now takes a place offered to the caller even when the event otherwise reads as full, sends `registration_full` to the organiser and coordinator when it takes the last place, and takes the caller off the list.
+- **SG2-63's picture** (`GET /api/event-requests/:eventId/registrations`) adds `waiting_list_response_hours` and `waiting_list: [{ entry_id, name, organisation, status, joined_at, offer_expires_at, position }]`; the settings (`PATCH .../registration-settings`) accept `waiting_list_response_hours`, a whole number from 1 to 168.
+
 ## 10. Health
 
 ### 10.1 GET /health and GET /api/health

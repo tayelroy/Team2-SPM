@@ -89,9 +89,9 @@ test('SG2-60-N01 | [FAILURE] [SG2-60:AC1] [SG2-60:AC3] [SG2-60:AC4] a full, not 
   await signIn(page, 'attendee');
 
   // AC1: the only place is taken (the attendee's own cancelled one gives none back).
+  // SG2-61 AC1: a full event is refused before the form, which offers its waiting list instead.
   let registration = await openEvent(page, 'Small Recital');
-  await registration.getByRole('button', { name: 'Register', exact: true }).click();
-  await expect(registration.getByRole('alert')).toHaveText('This event is full.');
+  await expect(registration.getByRole('alert')).toContainText('This event is full.');
   await expect(registration.getByRole('button', { name: 'Register', exact: true })).toHaveCount(0);
 
   // AC3: not yet open says when, with no form.

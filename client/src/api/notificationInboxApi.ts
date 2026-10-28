@@ -28,6 +28,8 @@ const EVENT_KINDS = new Set(['venue_request_approved', 'venue_request_rejected',
   'registration_withdrawn',
   // SG2-65 AC1/AC2: the coordinator accepted or refused the organiser's change.
   'change_accepted', 'change_refused',
+  // SG2-61 AC3: the event is full; SG2-62 AC6: a waiting-list place is offered, or the offer lapsed.
+  'registration_full', 'waiting_list_offer', 'waiting_list_offer_lapsed',
   // SG2-102 AC1: the date, time or venue of the attendee's event changed.
   'event_changed']);
 const HOLD_KINDS = new Set(['placed', 'warning', 'expired', 'expiry_changed']);

@@ -10,7 +10,7 @@ function respond(value: unknown, status = 200) {
   const fetch = vi.fn(async () => Response.json(value, { status })); vi.stubGlobal('fetch', fetch); return fetch;
 }
 
-test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] [SG2-102:AC1] [SG2-102:AC2] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
+test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] [SG2-102:AC1] [SG2-102:AC2] [SG2-61:AC3] [SG2-62:AC6] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
   const notifications = [
     entry,
     ...['venue_request_approved', 'venue_request_rejected', 'venue_booking_released', 'equipment_reserved',
@@ -26,6 +26,9 @@ test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] 
       message: 'Ana withdrew from Forum. 9 of 10 places now remain.' },
     { ...entry, kind: 'event_changed', notification_id: 72,
       message: 'Forum has changed. Date and time: 20 Jul 2030 19:00 SGT → 21 Jul 2030 19:00 SGT. Open My registrations for the latest details.' },
+    { ...entry, kind: 'registration_full', notification_id: 73, message: 'Forum is now full: all places are taken (capacity 10).' },
+    { ...entry, kind: 'waiting_list_offer', notification_id: 74, message: 'A place has opened at Forum.' },
+    { ...entry, kind: 'waiting_list_offer_lapsed', notification_id: 75, message: 'The place held for you at Forum was not taken.' },
     ...['placed', 'warning', 'expiry_changed']
       .map((kind, index) => ({ ...entry, source: 'hold', kind, notification_id: index + 100 })),
   ];

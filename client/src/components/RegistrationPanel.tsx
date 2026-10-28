@@ -23,13 +23,16 @@ export const REGISTRATION_STATE: Record<RegistrationWindow, string> = {
 };
 
 const MAX_CAPACITY = 2_147_483_647;
+/** SG2-62 AC6: the response window is whole hours, up to a week. */
+const MAX_RESPONSE_HOURS = 168;
 
 /**
  * SG2-63: the registration picture for an organiser of the event's
  * organisation or its assigned coordinator (AC1–AC4), and the creating
  * organiser's settings: capacity and opening and closing times, closing early,
  * and reopening or extending by a later closing time (AC5–AC7). Everyone else
- * sees the settings read-only (AC8).
+ * sees the settings read-only (AC8). SG2-61 AC7: the waiting list; SG2-62
+ * AC6: the creating organiser sets how long an offered place is held.
  */
 export default function RegistrationPanel(props: Props) {
   return <Panel key={`${props.eventId}:${props.accessToken}`} {...props} />;
@@ -85,9 +88,12 @@ function Picture({ view, eventId, accessToken, onChanged }: {
         <div><dt>Places remaining</dt><dd data-testid="registration-remaining">{view.places_remaining ?? 'No capacity set'}</dd></div>
         <div><dt>Opens</dt><dd>{time(view.registration_opens_at)}</dd></div>
         <div><dt>Closes</dt><dd>{time(view.registration_closes_at)}</dd></div>
+        <div><dt>Waiting list</dt><dd data-testid="waiting-count">{view.waiting_list.length}</dd></div>
+        <div><dt>Offer held for</dt><dd>{hoursLabel(view.waiting_list_response_hours)}</dd></div>
       </dl>
       {view.capacity_warnings.length > 0 ? <Warnings warnings={view.capacity_warnings} /> : null}
       <Attendees view={view} />
+      <WaitingList view={view} />
       {view.can_edit ? (
         <SettingsForm view={view} eventId={eventId} accessToken={accessToken} onChanged={onChanged} />
       ) : (
@@ -138,6 +144,35 @@ function Attendees({ view }: { view: RegistrationView }) {
   );
 }
 
+const hoursLabel = (hours: number) => (hours === 1 ? '1 hour' : `${hours} hours`);
+
+/** SG2-61 AC7: who is waiting, first come first served, and any place held for one of them. */
+function WaitingList({ view }: { view: RegistrationView }) {
+  return (
+    <div className="registration-attendees">
+      <h4>Waiting list</h4>
+      {view.waiting_list.length === 0 ? (
+        <p className="organisation-detail-hint">No one is on the waiting list.</p>
+      ) : (
+        <ol aria-label="Waiting list">
+          {view.waiting_list.map((entry) => (
+            <li key={entry.entry_id} className="registration-attendee">
+              <strong>{entry.name}</strong>
+              {entry.organisation ? <span>{entry.organisation}</span> : null}
+              <span>
+                {entry.status === 'offered' && entry.offer_expires_at
+                  ? `Place offered, held until ${formatSgtTimestamp(entry.offer_expires_at)}`
+                  : `Waiting, number ${entry.position}`}
+              </span>
+              <span className="organisation-detail-hint">Joined {formatSgtTimestamp(entry.joined_at)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 /** Only something shaped like an email address becomes a mailto link; anything else is plain text. */
 const EMAIL_SHAPE = /^[^@\s:/]+@[^@\s:/]+\.[^@\s:/]+$/;
 
@@ -146,12 +181,13 @@ function EmailAddress({ email }: { email: string }) {
 }
 
 /** What the form holds, as typed: capacity text and Singapore-time datetime-local values. */
-interface Draft { capacity: string; opens: string; closes: string }
+interface Draft { capacity: string; opens: string; closes: string; hours: string }
 
 const draftOf = (view: RegistrationView): Draft => ({
   capacity: view.registration_capacity === null ? '' : String(view.registration_capacity),
   opens: view.registration_opens_at ? isoToSgtLocal(view.registration_opens_at) : '',
   closes: view.registration_closes_at ? isoToSgtLocal(view.registration_closes_at) : '',
+  hours: String(view.waiting_list_response_hours),
 });
 
 /** Only what differs from the stored settings is sent; null clears a setting. */
@@ -163,6 +199,7 @@ function changesOf(view: RegistrationView, draft: Draft): RegistrationSettingsIn
   }
   if (draft.opens !== stored.opens) changes.registration_opens_at = draft.opens ? sgtToIso(draft.opens) : null;
   if (draft.closes !== stored.closes) changes.registration_closes_at = draft.closes ? sgtToIso(draft.closes) : null;
+  if (draft.hours.trim() !== stored.hours) changes.waiting_list_response_hours = Number(draft.hours.trim());
   return changes;
 }
 
@@ -181,6 +218,10 @@ function problemsOf(draft: Draft, view: RegistrationView): string[] {
   } else if (capacity !== '' && Number(capacity) < registered) {
     // Nobody already registered loses their place (capacity is at least 1, so two or more here).
     problems.push(`${registered} people are already registered, so the capacity cannot be lower than ${registered}.`);
+  }
+  const hours = draft.hours.trim();
+  if (!(/^\d+$/.test(hours) && Number(hours) >= 1 && Number(hours) <= MAX_RESPONSE_HOURS)) {
+    problems.push(`The waiting-list response window must be a whole number of hours from 1 to ${MAX_RESPONSE_HOURS}.`);
   }
   if (draft.opens && draft.closes && sgtToIso(draft.closes) <= sgtToIso(draft.opens)) {
     problems.push('Registration must close after it opens.');
@@ -258,6 +299,11 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
           Closes (Singapore time)
           <input type="datetime-local" value={draft.closes} disabled={busy}
             onChange={(event) => setDraft({ ...draft, closes: event.target.value })} />
+        </label>
+        <label>
+          Hold an offered place for (hours)
+          <input type="number" min={1} max={MAX_RESPONSE_HOURS} inputMode="numeric" value={draft.hours} disabled={busy}
+            onChange={(event) => setDraft({ ...draft, hours: event.target.value })} />
         </label>
       </div>
       {warnings.length > 0 ? <Warnings warnings={warnings} /> : null}

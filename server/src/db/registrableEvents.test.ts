@@ -14,7 +14,7 @@ const event = {
   event_id: 41, name: 'Harbour Lecture', organisation: 'Harbour Foundation', category: 'seminar',
   description: 'Talks and a panel.', proposed_date: '2030-07-20T02:00:00+00:00',
   registration_opens_at: '2026-10-01T00:00:00+00:00', registration_closes_at: '2030-07-19T02:00:00+00:00',
-  venues: [{ name: 'Regression Hall', location: 'Level 1' }], registered: false
+  venues: [{ name: 'Regression Hall', location: 'Level 1' }], registered: false, full: false, waiting: null
 };
 
 function client(result: { data?: unknown; error?: unknown; status?: number }, calls: unknown[] = []) {
@@ -43,7 +43,7 @@ test('[BOUNDARY] [SG2-59:AC3] details the database left out are null or empty ra
   assert.deepEqual(sparse, {
     event_id: 9, name: '', organisation: null, category: null, description: null, proposed_date: null,
     registration_opens_at: null, registration_closes_at: null, venues: [{ name: 'Unnamed venue', location: null }],
-    registered: false
+    registered: false, full: false, waiting: null
   });
   const none = await createRegistrableEventsStore('t', () => client({ data: { event_id: 10 } })).get(10);
   assert.deepEqual(none?.venues, []);

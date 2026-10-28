@@ -33,6 +33,8 @@ const FIELD_LABELS: Record<string, string> = {
   registration_capacity: 'Registration Capacity',
   registration_opens_at: 'Registration Opens At',
   registration_closes_at: 'Registration Closes At',
+  // SG2-62 AC6: the organiser's waiting-list response window.
+  waiting_list_response_hours: 'Waiting List Response Window (Hours)',
   planning_notes: 'Planning Notes',
   arrangements_recheck_needed: 'Arrangements Recheck Needed',
   status: 'Status',

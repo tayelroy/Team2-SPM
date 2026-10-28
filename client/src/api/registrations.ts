@@ -1,4 +1,4 @@
-/** SG2-63: the registration picture for an event and its organiser's settings. */
+/** SG2-63: the registration picture for an event and its organiser's settings; SG2-61: its waiting list. */
 import type { RegistrationWindow } from './eventConfirmation';
 
 export interface RegisteredAttendee {
@@ -13,6 +13,19 @@ export interface RegisteredAttendee {
   needs?: string | null;
 }
 
+/** SG2-61 AC7: one attendee on the waiting list, in the order they joined. */
+export interface WaitingAttendee {
+  entry_id: number;
+  name: string;
+  organisation: string | null;
+  /** offered: a place is held for them until offer_expires_at (SG2-62 AC6). */
+  status: 'waiting' | 'offered';
+  joined_at: string;
+  offer_expires_at: string | null;
+  /** 1 for the next to be offered a place; null once offered. */
+  position: number | null;
+}
+
 export interface RegistrationView {
   event_id: number;
   status: string;
@@ -20,11 +33,14 @@ export interface RegistrationView {
   registration_capacity: number | null;
   registration_opens_at: string | null;
   registration_closes_at: string | null;
+  /** SG2-62 AC6: how long a place offered from the waiting list is held. */
+  waiting_list_response_hours: number;
   window: RegistrationWindow;
   registered_count: number;
   places_remaining: number | null;
   contact_details_visible: boolean;
   attendees: RegisteredAttendee[];
+  waiting_list: WaitingAttendee[];
   venues: { venue_id: number; name: string; capacity: number | null }[];
   capacity_warnings: string[];
   can_edit: boolean;
@@ -34,6 +50,7 @@ export interface RegistrationSettingsInput {
   registration_capacity?: number | null;
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
+  waiting_list_response_hours?: number;
 }
 
 export type RegistrationResult =
@@ -57,15 +74,24 @@ function isAttendee(value: unknown): value is RegisteredAttendee {
     && (row.needs === undefined || isTextOrNull(row.needs));
 }
 
+function isWaiting(value: unknown): value is WaitingAttendee {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.entry_id === 'number' && isText(row.name) && isTextOrNull(row.organisation)
+    && (row.status === 'waiting' || row.status === 'offered') && isText(row.joined_at)
+    && isTextOrNull(row.offer_expires_at) && isCountOrNull(row.position);
+}
+
 /** The server's answer, checked field by field; null when it is not one. */
 export function readRegistrationView(body: unknown): RegistrationView | null {
   if (typeof body !== 'object' || body === null) return null;
   const view = body as Record<string, unknown>;
   const valid = typeof view.event_id === 'number' && isText(view.status) && typeof view.registration_needed === 'boolean'
     && isCountOrNull(view.registration_capacity) && isTextOrNull(view.registration_opens_at)
-    && isTextOrNull(view.registration_closes_at) && WINDOWS.includes(view.window as RegistrationWindow)
+    && isTextOrNull(view.registration_closes_at) && typeof view.waiting_list_response_hours === 'number' && WINDOWS.includes(view.window as RegistrationWindow)
     && typeof view.registered_count === 'number' && isCountOrNull(view.places_remaining)
     && typeof view.contact_details_visible === 'boolean' && Array.isArray(view.attendees) && view.attendees.every(isAttendee)
+    && Array.isArray(view.waiting_list) && view.waiting_list.every(isWaiting)
     && Array.isArray(view.venues) && Array.isArray(view.capacity_warnings) && view.capacity_warnings.every(isText)
     && typeof view.can_edit === 'boolean';
   return valid ? view as unknown as RegistrationView : null;

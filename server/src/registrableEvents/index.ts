@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { AccessError, authorization } from '../auth';
-import { createRegistrableEventsStore, type RegisterResult } from '../db/registrableEvents';
+import { createRegistrableEventsStore, type JoinWaitingListResult, type RegisterResult } from '../db/registrableEvents';
 import { formatInstant } from '../events/changeImpact';
 import { readRegistration } from './registration';
 
@@ -52,6 +52,34 @@ function sendRegistration(res: Response, result: RegisterResult) {
   }
 }
 
+/** SG2-61: the answer for each waiting-list outcome. */
+function sendJoin(res: Response, result: JoinWaitingListResult) {
+  switch (result.outcome) {
+    case 'ok':
+      res.status(201).json({ waiting: result.waiting });
+      return;
+    case 'already':
+      res.status(409).json({ error: 'You are already on the waiting list for this event.', reason: 'already', waiting: result.waiting });
+      return;
+    case 'registered':
+      res.status(409).json({ error: 'You are already registered for this event.', reason: 'registered' });
+      return;
+    case 'not_full':
+      res.status(409).json({ error: 'Places are still available. Register instead.', reason: 'not_full' });
+      return;
+    case 'missing':
+      res.status(404).json({ error: NOT_FOUND_MESSAGE });
+      return;
+    case 'not_open':
+      res.status(409).json({ error: `Registration opens ${formatInstant(result.registration_opens_at)}.`,
+        reason: 'not_open', registration_opens_at: result.registration_opens_at });
+      return;
+    case 'closed':
+      res.status(409).json({ error: 'Registration for this event has closed.', reason: 'closed',
+        registration_closes_at: result.registration_closes_at });
+  }
+}
+
 /**
  * GET /api/registrable-events — the confirmed events an attendee can register
  * for, whose registration is open or opens later, soonest first, with name,
@@ -67,6 +95,12 @@ function sendRegistration(res: Response, result: RegisterResult) {
  * window that is not open, with when it opens or that it closed (AC3), or a
  * full event; 400 for missing or invalid details (AC4), checked before the
  * database is asked. Needs 'events.register' and an attendee acting role.
+ * POST /api/registrable-events/:eventId/waiting-list — joins a full event's
+ * waiting list (SG2-61 AC5): 201 with the position; 409 when already on it
+ * or registered (AC6), when places remain, or outside the window.
+ * DELETE /api/registrable-events/:eventId/waiting-list — leaves it at any
+ * time (AC6): 200, or 404 when not on it. Both need 'events.register', as
+ * joining the list is the way to register for a full event.
  */
 export function createRegistrableEventsRouter(access = authorization, store = createRegistrableEventsStore) {
   const router = access.protectedRouter();
@@ -101,6 +135,26 @@ export function createRegistrableEventsRouter(access = authorization, store = cr
     }
     try {
       sendRegistration(res, await store(req.get('authorization')!.slice(7)).register(eventId, validation.values));
+    } catch (error) {
+      send(res, error);
+    }
+  });
+  router.post('/:eventId/waiting-list', access.requirePermission('events.register'), async (req, res) => {
+    const eventId = eventIdOf(req, res);
+    if (eventId === null) return;
+    try {
+      sendJoin(res, await store(req.get('authorization')!.slice(7)).joinWaitingList(eventId));
+    } catch (error) {
+      send(res, error);
+    }
+  });
+  router.delete('/:eventId/waiting-list', access.requirePermission('events.register'), async (req, res) => {
+    const eventId = eventIdOf(req, res);
+    if (eventId === null) return;
+    try {
+      const result = await store(req.get('authorization')!.slice(7)).leaveWaitingList(eventId);
+      if (result.outcome === 'ok') res.status(200).json({ left: true });
+      else res.status(404).json({ error: 'You are not on the waiting list for this event.' });
     } catch (error) {
       send(res, error);
     }

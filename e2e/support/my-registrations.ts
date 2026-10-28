@@ -1,6 +1,7 @@
 import { AccessError } from '../../server/src/auth/policy';
 import type { MyRegistration, MyRegistrationsStore, RegistrationStanding, WithdrawResult } from '../../server/src/db/myRegistrations';
 import type { MemoryDatabase } from './memory-database';
+import { offerWaitingPlaces } from './registrable-events';
 
 type Row = Record<string, unknown>;
 const text = (value: unknown) => (typeof value === 'string' ? value : null);
@@ -75,6 +76,8 @@ export function createMemoryMyRegistrationsStore(database: MemoryDatabase, token
           recipient_id: recipient, event_id: event.event_id, request_id: null, kind: 'registration_withdrawn', message,
           created_at: withdrawn_at, read_at: null });
       }
+      // SG2-62 AC6: the freed place goes to the waiting list first.
+      offerWaitingPlaces(database, event);
       return { outcome: 'ok', withdrawal: { registration_id: Number(registration.registration_id), event_id: Number(event.event_id), withdrawn_at } };
     }
   };

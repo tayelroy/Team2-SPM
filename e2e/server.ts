@@ -78,7 +78,7 @@ import { createMemoryEventSearchStore, seedEventSearch } from './support/event-s
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
 import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
-import { createMemoryRegistrableEventsStore, seedEventRegistration, seedRegistrableEvents } from './support/registrable-events';
+import { createMemoryRegistrableEventsStore, seedEventRegistration, seedRegistrableEvents, seedWaitingList } from './support/registrable-events';
 import { createMyRegistrationsRouter } from '../server/src/myRegistrations';
 import { createMemoryMyRegistrationsStore, seedMyRegistrations } from './support/my-registrations';
 
@@ -412,6 +412,19 @@ app.get('/__e2e/my-registrations-ledger', (_req, res) => {
   res.json({
     registrations: database.tables.registrations.filter(row => [593, 597, 598, 599].includes(Number(row.event_id))),
     notifications: database.tables.notifications.filter(row => row.kind === 'registration_withdrawn'),
+  });
+});
+// SG2-61: a full event whose only place a guest holds.
+app.post('/__e2e/waiting-list', (_req, res) => {
+  seedWaitingList(database);
+  res.status(204).end();
+});
+// SG2-61: the waiting list, registrations and notices for that event.
+app.get('/__e2e/waiting-list-ledger', (_req, res) => {
+  res.json({
+    entries: database.tables.waiting_list_entries.filter(row => row.event_id === 611),
+    registrations: database.tables.registrations.filter(row => row.event_id === 611),
+    notifications: database.tables.notifications.filter(row => row.event_id === 611),
   });
 });
 // SG2-60: the registrations and confirmations the loopback app now holds.
