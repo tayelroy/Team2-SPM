@@ -1,9 +1,10 @@
-# Registrations (SG2-63, SG2-60, SG2-62)
+# Registrations (SG2-63, SG2-60, SG2-62, SG2-61)
 
 The registration picture for an event, and the Event Organiser's control of
 its registration settings (SG2-63), and attendees registering (SG2-60, see
-[Registering](#registering-sg2-60)). Being refused when full and withdrawing
-are SG2-61 and SG2-62; they write the same `public.registrations` rows.
+[Registering](#registering-sg2-60)). Withdrawing (SG2-62) and the waiting list
+for a full event (SG2-61, see [Full events and the waiting list](#full-events-and-the-waiting-list-sg2-61))
+write the same `public.registrations` rows.
 
 ## Who sees what
 
@@ -192,3 +193,73 @@ Migration `202610260003_registration_withdrawal.sql`; tests
 `client/src/api/myRegistrations.test.ts`, integration
 `native withdrawal lists the attendee's registration…` and browser journeys
 `SG2-62-P01`, `SG2-62-P02` and `SG2-62-N01`.
+
+## Full events and the waiting list (SG2-61)
+
+An event is **full** when every place is held: by an active registration, or
+by a place offered from its waiting list that has not run out (someone
+else's; the attendee's own offer is theirs to take). Find events marks a full
+event **Full**, and registering is refused as `full` (AC1). Two attempts on
+the last place are decided one at a time under the event row lock; exactly
+one succeeds (AC2, `test-registration-concurrency.mjs`).
+
+**Capacity reached (AC3).** The registration that takes the last place sends
+the organiser and the assigned coordinator a `registration_full` notice:
+"Chamber Concert is now full: all places are taken (capacity 2)."
+
+**Capacity (AC4)** stays the organiser's SG2-63 setting. Raising it, even past
+a booked venue's capacity (SG2-63 still warns), offers the new places to the
+waiting list first.
+
+**The list (AC5, AC6).** On a full event the attendee is offered **Join the
+waiting list** instead of the form. The list is first come, first served; the
+attendee sees "You are number 2 on the waiting list." and a **Waiting list #2**
+badge. Someone who holds a place cannot join (`registered`), nor can someone
+already on it (`already`, a partial unique index backs this). **Leave the
+waiting list** works at any time; those behind move up, and joining again goes
+to the back. The list is joined only while registration is open, and only when
+the event is full (`not_full` otherwise).
+
+**Who sees it (AC7).** The organiser's and coordinator's registration panel
+lists it in order, with "Waiting, number 1" or "Place offered, held until …".
+The same people who see SG2-63's picture see it (colleagues included, names
+only; it holds no contact details).
+
+### Offering a freed place (SG2-62 AC6)
+
+When a withdrawal, a capacity increase or someone leaving with an offer frees
+a place, the first waiting attendee is **offered** it: the place is held for
+them and they get a `waiting_list_offer` notice ("A place has opened at
+Chamber Concert. It is held for you until 10 Sep 2030 19:00 SGT: register from
+Find events to take it."). Find events shows **Place held for you** and the
+form with the time. Registering takes it; leaving passes it on.
+
+- **The response window** is set by the creating organiser in the
+  registration settings ("Hold an offered place for (hours)"): whole hours
+  from 1 to 168, 24 by default. **Team decision (28 Oct 2026), PO to
+  confirm:** no story set the window's unit or range. A change applies to
+  offers made afterwards and is written to the event history.
+- An offer runs until the window ends, or until registration closes or the
+  event starts if sooner. One not taken in time **lapses**: the attendee is
+  sent `waiting_list_offer_lapsed` and leaves the list, and the place is
+  offered to the next. Closing registration early, cancelling or moving the
+  event also ends running offers, without that notice (those have their own).
+- Lapsed offers are caught by `public.process_waiting_list_offers()`, which
+  pg_cron runs every minute on Supabase (job `waiting-list-offers`); every
+  registration, join, withdrawal and settings change catches them first too.
+- With nobody waiting, a freed place is free to anyone, as before.
+- Lowering capacity below registrations plus running offers is not refused
+  (SG2-63 only refuses below the registrations): those offered can still
+  register while a place remains.
+
+Migration `202610280001_waiting_list.sql` (table `waiting_list_entries`,
+`events.waiting_list_response_hours`, `join_waiting_list`,
+`leave_waiting_list`, `process_waiting_list_offers`, and new versions of
+`register_for_event`, `withdraw_registration`, `update_registration_settings`,
+`event_registration_overview` and `private.registrable_events_json`); rollback
+`supabase/rollbacks/202610280001_waiting_list_down.sql`. Tests
+`supabase/tests/waiting_list.sql`, the concurrency script above,
+`server/src/waitingList.test.ts`,
+`client/src/screens/FindEvents.waitingList.test.tsx` and browser journeys
+`SG2-61-P01` and `SG2-61-N01`.
+

@@ -10099,5 +10099,72 @@
       "by": "LIM DAO JUN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-61-P01",
+    "title": "A full event offers its waiting list; the organiser sees it and raises capacity, and the waiting attendee takes the place held for them",
+    "type": "NORMAL",
+    "story": "SG2-61",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-61:AC1",
+      "SG2-61:AC3",
+      "SG2-61:AC4",
+      "SG2-61:AC5",
+      "SG2-61:AC7",
+      "SG2-62:AC6"
+    ],
+    "method_id": "SG2-61:a-full-event-offers-its-waiting-list-the-organiser-sees-it-and-raises-capacity-and-the-waiting",
+    "purpose": "Catch a full event that still shows the form, a list that does not show the position or never reaches the organiser, a capacity increase that does not offer the place to the list, an offer the attendee cannot take, or a missing capacity-reached notice.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/waiting-list seed (Chamber Concert, capacity 1, held by a guest) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran locally in Chromium against the production app build and reset loopback fixture.",
+    "execution_evidence": "28 Oct 2026; feature/SG2-61-waiting-list on origin/main 91c46b5; npx playwright test e2e/waiting-list.spec.ts locally in Chromium. No hosted Supabase validation.",
+    "execution_date": "28 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 390px, open Find events and read the Chamber Concert card.",
+      "Open its details, read the refusal, press Join the waiting list and read the position; read the ledger.",
+      "At 1440px sign in as the organiser, open Chamber Concert from My events and read the Waiting list.",
+      "Set Capacity to 2 and save; read the waiting list entry.",
+      "At 390px sign in as attendee, open Find events, read the badge, open the details, read the held-place notice and press Register; read the ledger."
+    ],
+    "data": "Chamber Concert (611): confirmed, 10 Sep 2030 19:00 SGT at Regression Hall, registration open, capacity 1 held by Concert Guest, offers held 24 hours.",
+    "expected": "The card shows Full; the details say 'This event is full.' with no Register button; after joining, 'You are number 1 on the waiting list.' and one waiting entry. The organiser's list shows Regression attendee, 'Waiting, number 1'; after raising capacity to 2 it shows 'Place offered, held until'. The attendee's card shows 'Place held for you'; the notice says the place is held; Register shows 'You are registered. Your place is held.'; the entry is registered; one waiting_list_offer to the attendee; registration_full to the organiser and coordinator: 'Chamber Concert is now full: all places are taken (capacity 2).' No overflow at 390px; no console errors.",
+    "evidence": "e2e/waiting-list.spec.ts; e2e/support/registrable-events.ts; e2e/support/registrations.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-61-N01",
+    "title": "An attendee cannot join the waiting list twice, can leave it at any time, and leaving again is refused",
+    "type": "CONFLICT",
+    "story": "SG2-61",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-61:AC6"
+    ],
+    "method_id": "SG2-61:an-attendee-cannot-join-the-waiting-list-twice-can-leave-it-at-any-time-and-leaving-again-is",
+    "purpose": "Catch a second entry for the same attendee, a leave that does not take them off the list, or a second leave that claims success.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/waiting-list seed (Chamber Concert, capacity 1, held by a guest) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran locally in Chromium against the production app build and reset loopback fixture.",
+    "execution_evidence": "28 Oct 2026; feature/SG2-61-waiting-list on origin/main 91c46b5; npx playwright test e2e/waiting-list.spec.ts locally in Chromium. No hosted Supabase validation.",
+    "execution_date": "28 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 1440px; POST the waiting list twice through the API and read the ledger.",
+      "Open Find events, read the badge, open Chamber Concert and press Leave the waiting list.",
+      "Read the ledger; DELETE the waiting list through the API."
+    ],
+    "data": "Chamber Concert (611), full; the attendee is not on its list at the start.",
+    "expected": "The first POST is 201, the second 409 already, and the ledger holds one entry. The card shows 'Waiting list #1'. After leaving, 'You have left the waiting list.' with Join the waiting list offered again; the entry is left with ended_at; the second DELETE is 404.",
+    "evidence": "e2e/waiting-list.spec.ts; e2e/support/registrable-events.ts",
+    "layer": "Playwright Chromium + isolated production app"
   }
 ]

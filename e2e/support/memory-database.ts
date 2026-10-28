@@ -73,6 +73,8 @@ export class MemoryDatabase {
       equipment_reservations: [],
       // SG2-66: attendee registrations, counted when a change is assessed.
       registrations: [],
+      // SG2-61: attendees waiting for a place on a full event.
+      waiting_list_entries: [],
       // SG2-92: the Safety Officer's decisions, append-only.
       event_safety_decisions: [],
       // SG2-93: requests a Request Changes decision sent back to staff.
