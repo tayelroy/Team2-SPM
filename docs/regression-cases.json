@@ -502,10 +502,12 @@
     "steps": [
       "Open New request with no fields and verify Submit request is disabled.",
       "Save the empty draft, name it Partial draft and save again.",
-      "Read the request list and attempt submission through the fixture API."
+      "Read the request list and attempt submission through the fixture API.",
+      "Complete the draft with a proposed date of 1 Sep 2026 (already past), save it and attempt submission again.",
+      "Reopen it from My drafts and check the date field and Submit request."
     ],
-    "data": "Initially empty fields; then name Partial draft only",
-    "expected": "One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
+    "data": "Initially empty fields; then name Partial draft only; then every field with proposed date 2026-09-01T02:00Z (past)",
+    "expected": "One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft. The past-dated save returns 200 with missingForSubmission ['proposed_date_in_past']; its submission returns 400 'proposed_date must be in the future.' and it stays a draft; reopened, the form shows 'Date must be in the future' and Submit request is disabled.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",

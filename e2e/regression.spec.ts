@@ -471,8 +471,29 @@ test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] 
   const records = await eventRecords(page);
   expect(records).toHaveLength(2); // one seeded own draft + one newly-created draft
   const created = records.find(r => r.name === 'Partial draft')!;
-  expect((await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers: await authHeaders(page) })).status()).toBe(400);
+  const headers = await authHeaders(page);
+  expect((await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers })).status()).toBe(400);
   expect((await eventRecords(page)).find(r => r.event_id === created.event_id)?.status).toBe('draft');
+  // SG2-30 AC2: completing it with a date already gone still saves, but the
+  // date is outstanding, submission is refused and it stays a draft.
+  const pastDated = await page.request.patch(`/api/event-requests/${created.event_id}`, { headers, data: {
+    name: 'Partial draft', purpose: 'Team planning', description: 'Review the release plan',
+    proposed_date: '2026-09-01T02:00:00.000Z', expected_attendance: 25, venue_requirements: 'Projector',
+    preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false } });
+  expect([pastDated.status(), (await pastDated.json()).missingForSubmission]).toEqual([200, ['proposed_date_in_past']]);
+  const refused = await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers });
+  expect([refused.status(), await refused.json()]).toEqual([400,
+    { error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past'] }]);
+  expect((await eventRecords(page)).find(r => r.event_id === created.event_id)?.status).toBe('draft');
+  // Reopened from My drafts, the form names the problem and will not submit.
+  await nav(page, 'My drafts');
+  await page.getByRole('region', { name: 'My draft requests', exact: true }).locator('div')
+    .filter({ has: page.getByRole('heading', { name: 'Partial draft', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Edit', exact: true }) }).last()
+    .getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel(/^Date/)).toHaveValue('2026-09-01T10:00');
+  await expect(page.getByText('Date must be in the future', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
 });
 
 test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then submitting preserves the latest field values', async ({ page }) => {

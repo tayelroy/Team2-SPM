@@ -533,7 +533,7 @@ describe('the events table', () => {
               name: 'Annual General Meeting',
               purpose: 'AGM 2026',
               description: 'Yearly shareholder meeting',
-              proposed_date: '2026-10-25T10:00:00.000Z',
+              proposed_date: '2030-10-25T10:00:00.000Z',
               expected_attendance: 120,
               venue_requirements: 'Auditorium',
               accessibility_needs: 'Wheelchair ramp',
@@ -550,7 +550,7 @@ describe('the events table', () => {
               {
                 event_id: 101,
                 name: 'Annual General Meeting',
-                proposed_date: '2026-10-25T10:00:00.000Z',
+                proposed_date: '2030-10-25T10:00:00.000Z',
                 status: 'draft',
                 coordinator_id: null,
                 coordinator_name: null,
@@ -654,7 +654,7 @@ describe('the request form', () => {
     const submitted = {
       event_id: 42, name: 'Investor Forum 2026', status: 'submitted', organiser_id: 'user-1',
       purpose: 'Partner briefing', description: 'A half-day forum with two keynotes and a panel.',
-      proposed_date: '2026-10-12T00:00:00.000Z', expected_attendance: 180,
+      proposed_date: '2030-10-12T00:00:00.000Z', expected_attendance: 180,
       venue_requirements: 'Stage + loop', can_manage: true,
     };
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -686,7 +686,7 @@ describe('the request form', () => {
     // AC2: fill all required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.
@@ -719,7 +719,7 @@ describe('the request form', () => {
     expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     // 08:00 on 12 Oct in Singapore is midnight UTC.
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({
-      name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2026-10-12T00:00:00.000Z',
+      name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2030-10-12T00:00:00.000Z',
     });
   });
 
@@ -727,7 +727,7 @@ describe('the request form', () => {
     await openForm();
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.
@@ -784,7 +784,7 @@ describe('editing a draft (SG2-29)', () => {
 
     // AC2: fill the remaining required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.

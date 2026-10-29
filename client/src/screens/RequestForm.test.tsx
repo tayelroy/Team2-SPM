@@ -54,7 +54,7 @@ const DEFAULT_PROPS = {
 function fillAllFields() {
   fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum 2026' } });
   fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-  fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T10:00' } });
+  fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T10:00' } });
   fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
   fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
   fireEvent.change(screen.getByLabelText(/Description/i), {
@@ -184,7 +184,7 @@ describe('AC1 — successful submission', () => {
       name: 'Forum 2026',
       purpose: 'Partner briefing',
       description: 'A half-day forum with keynotes and a panel.',
-      proposed_date: '2026-10-12T02:00:00.000Z',
+      proposed_date: '2030-10-12T02:00:00.000Z',
       expected_attendance: 180,
       venue_requirements: 'Stage + loop',
       preferred_layout: 'Theatre',
@@ -252,7 +252,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
 
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: '  Partner Forum  ' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Client briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-11-04T09:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-11-04T09:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '120' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: '  Stage  ' } });
     fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'Two keynotes' } });
@@ -265,7 +265,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(body.name).toBe('Partner Forum');
     expect(body.purpose).toBe('Client briefing');
     // 09:00 Singapore time is 01:00 UTC.
-    expect(body.proposed_date).toBe('2026-11-04T01:00:00.000Z');
+    expect(body.proposed_date).toBe('2030-11-04T01:00:00.000Z');
     expect(body.expected_attendance).toBe(120);
     expect(body.venue_requirements).toBe('Stage');
     expect(body.description).toBe('Two keynotes');
@@ -451,7 +451,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     name: 'Partner Forum',
     purpose: 'Client briefing',
     description: 'Two keynotes',
-    proposed_date: '2026-11-04T01:00:00.000Z',
+    proposed_date: '2030-11-04T01:00:00.000Z',
     expected_attendance: 120,
     venue_requirements: 'Stage',
     preferred_layout: 'Theatre',
@@ -481,7 +481,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByLabelText(/Event name/i)).toHaveValue('Partner Forum');
     expect(screen.getByLabelText(/Purpose/i)).toHaveValue('Client briefing');
     expect(screen.getByLabelText(/Description/i)).toHaveValue('Two keynotes');
-    expect(screen.getByLabelText(/Date/i)).toHaveValue('2026-11-04T09:00');
+    expect(screen.getByLabelText(/Date/i)).toHaveValue('2030-11-04T09:00');
     expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('120');
     expect(screen.getByLabelText(/Venue requirements/i)).toHaveValue('Stage');
     expect(screen.getByLabelText(/Preferred room layout/i)).toHaveValue('Theatre');
@@ -654,6 +654,63 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
     expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
   });
 
+  test('[FAILURE] [SG2-30:AC2] a draft reopened with a past date shows it as outstanding and blocks submission until the date moves forward', () => {
+    render(<RequestForm eventId="51" accessToken="test-token"
+      initialValues={{ ...STORED, proposed_date: '2026-10-01T02:00:00.000Z' }} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Date must be in the future');
+    expect(screen.getByLabelText(/Date/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-06-15T10:00' } });
+    expect(screen.queryByText('Date must be in the future')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+  });
+
+  test('[BOUNDARY] [SG2-30:AC2] a date one minute ahead can be submitted, the current minute cannot, and earlier times are not offered', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-10-29T03:00:00.000Z'));
+      render(<RequestForm eventId="1" accessToken="test-token"
+        initialValues={{ ...STORED, proposed_date: '2026-10-29T03:01:00.000Z' }} />);
+      const date = screen.getByLabelText(/Date/i);
+      expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+      // The picker's earliest choice is now, in Singapore time.
+      expect(date).toHaveAttribute('min', '2026-10-29T11:00');
+
+      fireEvent.change(date, { target: { value: '2026-10-29T11:00' } });
+      expect(screen.getByText('Date must be in the future')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('[FAILURE] [SG2-30:AC2] saving a past-dated draft keeps it, but says the date is still needed to submit', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(draftResponse(['proposed_date_in_past'], 51)));
+    render(<RequestForm eventId="51" accessToken="test-token"
+      initialValues={{ ...STORED, proposed_date: '2026-10-01T02:00:00.000Z' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(await screen.findByText('Draft 51 saved. Still needed to submit: Date must be in the future.')).toBeInTheDocument();
+    expect(screen.queryByText(/ready to submit/)).not.toBeInTheDocument();
+  });
+
+  test('[FAILURE] [SG2-30:AC2] a submission the server refuses for its date says so instead of reporting success', async () => {
+    const onSuccess = vi.fn();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(draftResponse([], 1))
+      .mockResolvedValueOnce(Response.json(
+        { error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past'] }, { status: 400 })));
+    renderStored(onSuccess);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+
+    expect(await screen.findByText('Date must be in the future before this request can be submitted.')).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
   test('[NORMAL] [SG2-29:AC2] a reopened draft shows no requirement chips or canned suitability banner it never stored', () => {
     renderStored();
 
@@ -801,7 +858,7 @@ describe('the customer minimum before submitting (SG2-105)', () => {
   function fillOriginalSix() {
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T10:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T10:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'A half-day forum.' } });

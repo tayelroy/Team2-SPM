@@ -30,7 +30,7 @@ const COMPLETE_BODY = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
   description: 'Half-day forum with keynotes and a reception.',
-  proposed_date: '2026-11-04T09:00:00.000Z',
+  proposed_date: '2030-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: 'Theatre',
@@ -407,7 +407,7 @@ describe('missingForSubmission', () => {
       name: null,
       purpose: '',
       // description is deliberately omitted to exercise undefined.
-      proposed_date: '2026-11-04T09:00:00.000Z',
+      proposed_date: '2030-11-04T09:00:00.000Z',
       expected_attendance: 10,
       venue_requirements: 'Stage',
       preferred_layout: 'Theatre',
@@ -422,8 +422,20 @@ describe('missingForSubmission', () => {
   test('[FAILURE] [SG2-105:AC1] accessibility, equipment, layout and registration now block submission when unanswered (replaces SG2-28 AC2)', () => {
     assert.deepEqual(missingForSubmission({
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
-      proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
+      proposed_date: '2030-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
     }), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
+  });
+
+  test('[BOUNDARY] [SG2-30:AC2] a date not after now is listed as outstanding; a blank one is only reported as missing', () => {
+    const now = Date.parse('2026-10-29T03:00:00.000Z');
+    const complete = {
+      name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session', expected_attendance: 10,
+      venue_requirements: 'Stage', preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None',
+      registration_needed: false
+    };
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:00:00.000Z' }, now), ['proposed_date_in_past']);
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:01:00.000Z' }, now), []);
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: null }, now), ['proposed_date']);
   });
 });
 

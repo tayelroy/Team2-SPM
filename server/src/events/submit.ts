@@ -10,7 +10,7 @@ import {
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import { eventLabel, eventNoticeMessages, fetchLeadIds, notifyEvent, type EventNotice } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
-import { missingForSubmission } from './fields';
+import { missingForSubmission, PROPOSED_DATE_IN_FUTURE_MESSAGE, PROPOSED_DATE_IN_PAST } from './fields';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
 
@@ -27,6 +27,8 @@ export interface SubmitEventRequestDependencies {
   writeHistory?: typeof insertAuditLogs;
   fetchLeads?: typeof fetchLeadIds;
   notify?: typeof notifyEvent;
+  /** The clock a proposed date must be after (SG2-30 AC2). */
+  now?: () => number;
 }
 
 /** Statuses a caller may submit from: a fresh draft, or a rejected request being reworked. */
@@ -37,8 +39,10 @@ const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected', 'needs_clarification'
  *
  * Only the request's own organiser may submit it, only while it is still a
  * `draft` or `rejected` (customer clarification: rejection is not final —
- * organisers may revise and resubmit), and only once every
- * SUBMISSION_REQUIRED_FIELDS value (SG2-28) is filled in. The transition to
+ * organisers may revise and resubmit), only once every
+ * SUBMISSION_REQUIRED_FIELDS value (SG2-28) is filled in, and only while the
+ * proposed date is still in the future (a past date is listed as the
+ * outstanding item `proposed_date_in_past`). The transition to
  * `submitted` happens only here, through the admin client, so it can never be
  * forged by a direct client write to `status` — the gap the AI Security
  * Review flagged on the earlier attempt at this ticket (PR #13).
@@ -63,7 +67,8 @@ export function submitEventRequestHandler({
   submitRequest = submitEventRequest,
   writeHistory = insertAuditLogs,
   fetchLeads = fetchLeadIds,
-  notify = notifyEvent
+  notify = notifyEvent,
+  now = Date.now
 }: SubmitEventRequestDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -107,11 +112,15 @@ export function submitEventRequestHandler({
       return;
     }
 
-    const missing = missingForSubmission(existing.request);
+    const missing = missingForSubmission(existing.request, now());
     if (missing.length > 0) {
-      // Criterion #2: refuse submission and list what is outstanding; the
-      // request stays in draft because no update is issued.
-      res.status(400).json({ error: 'Event request is missing required fields.', missing });
+      // Criterion #2: refuse submission and list what is outstanding — blank
+      // fields, or a date that is no longer in the future; the request stays
+      // in its current status because no update is issued.
+      const error = missing.length === 1 && missing[0] === PROPOSED_DATE_IN_PAST
+        ? PROPOSED_DATE_IN_FUTURE_MESSAGE
+        : 'Event request is missing required fields.';
+      res.status(400).json({ error, missing });
       return;
     }
 

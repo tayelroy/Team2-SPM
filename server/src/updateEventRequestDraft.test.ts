@@ -17,7 +17,7 @@ const COMPLETE_BODY = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
   description: 'Half-day forum with keynotes and a reception.',
-  proposed_date: '2026-11-04T09:00:00.000Z',
+  proposed_date: '2030-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: 'Theatre',
@@ -128,6 +128,16 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     const response = await request(buildApp()).patch('/api/event-requests/7').send(withoutAccessibility);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, ['accessibility_needs']);
+  });
+
+  test('[NORMAL] [SG2-28:AC4] [SG2-30:AC2] a complete draft moved to a past date is still saved, but reports the date as outstanding', async () => {
+    let updated: unknown;
+    const response = await request(buildApp({ captureUpdate: (_id, _organiser, values) => (updated = values) }))
+      .patch('/api/event-requests/7')
+      .send({ ...COMPLETE_BODY, proposed_date: '2026-10-01T02:00:00.000Z' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(updated, { ...COMPLETE_BODY, proposed_date: '2026-10-01T02:00:00.000Z' });
+    assert.deepEqual(response.body.missingForSubmission, ['proposed_date_in_past']);
   });
 
   test('[NORMAL] [SG2-28:AC4] [SG2-29:AC1] reports what is still outstanding for an incomplete update', async () => {

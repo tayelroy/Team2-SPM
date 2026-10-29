@@ -24,6 +24,7 @@ import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotific
 import { isLive } from './arrangementReadiness';
 import { RETURNS_TO_PLANNING } from './changeImpact';
 import { isRegistrationSettingField } from './registrationSettings';
+import { PROPOSED_DATE_IN_FUTURE_MESSAGE } from './fields';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -230,7 +231,7 @@ export function validatePlanningSchedule(
   if (update.proposed_date) {
     const chosen = new Date(update.proposed_date).getTime();
     if (chosen !== timeOf(current.proposed_date) && chosen <= now) {
-      errors.push('proposed_date must be in the future.');
+      errors.push(PROPOSED_DATE_IN_FUTURE_MESSAGE);
     }
   }
 

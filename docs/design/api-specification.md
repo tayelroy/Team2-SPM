@@ -321,12 +321,13 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 
   `submitted_at` is set.
 - **Errors:**
-  - 400 `{ error: "Event request is missing required fields.", missing[] }`
+  - 400 `{ error: "Event request is missing required fields.", missing[] }`, or `{ error: "proposed_date must be in the future.", missing: ["proposed_date_in_past"] }` when a past date is the only item
   - 404
   - 409 `Only a draft or rejected event request can be submitted.`
   - 503
 - **Rule:** only the creating EO; status must be `draft`, `rejected` or `needs_clarification`.
 - **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked. SG2-70's `category` is optional and not part of this list.
+- **Future date (SG2-30 AC2):** a `proposed_date` at or before the server's current time adds `proposed_date_in_past` to `missing[]` (after any blank fields) and the submission is refused the same way. Saving a draft still accepts it; the create and update responses list the same item in `missingForSubmission`.
 - **Side effects:**
   - an `event_audit_logs` status row
   - `notifications` of kind `event_submitted`: to every ECL when the status is `unassigned`, otherwise to the coordinator
