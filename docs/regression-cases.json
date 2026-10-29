@@ -6854,10 +6854,10 @@
     "purpose": "Protect current converted-hold canonical booking links through conversion, reasoned release and replacement, preventing phantom approved demand while preserving other bookings. A converted card remains a historical conversion receipt and must not claim its booking is still Confirmed after release.",
     "preconditions": "Disposable current PostgreSQL and current client/loopback fixtures; actual linked converted holds, assigned/unassigned identities and other confirmed bookings. Completed legacy-repair replay is outside the active scenario.",
     "steps": [
-      "Convert a valid tentative hold through normal approval and verify its approved request points to the actual canonical booking. Refuse an elapsed/timer-changed or missing booking path.",
+      "Convert a valid tentative hold through normal approval and verify its approved request points to the actual canonical booking. Refuse approval of a hold at or past its deadline or whose booked period has finished, and verify the deadline job leaves a converted hold and its booking unchanged.",
       "Release the converted booking with a real assigned actor and required reason; verify its request stops contributing venue demand while original other booking remains Confirmed, with real history/notices only.",
       "Approve a replacement for a converted-hold booking and verify the replaced request/booking retires, preserving unaffected arrangements and confirmation guards.",
-      "At390px/1440px, verify the converted card says Converted to booking, keeps Booking #N and directs users to the booking record for current status. Refresh/in-flight approval retains the receipt; failed approval cannot display it."
+      "At 390px/1440px, verify the converted card says Converted to booking, keeps Booking #N and directs users to the booking record for current status, including after its own booking is released. Refresh/in-flight approval retains the receipt; failed approval cannot display it."
     ],
     "data": "Current linked converted holds and released/confirmed canonical bookings, another original booking, assigned/other coordinator, missing release reason, timer-changed/missing conversion target and converted receipt after later release.",
     "expected": "New converted requests link to their actual canonical booking. Release/replacement cannot leave phantom approved venue demand or damage other bookings. Only actual release metadata/history/notices are recorded; refusal has no side effects. Receipt wording describes conversion and directs current-status questions to the booking. Completed backfill and repeat-migration behavior is historical only.",
@@ -6893,7 +6893,8 @@
       "SG2-84:approval-updates-only-that-hold-to-a-confirmed-booking-and-removes-its-actions",
       "SG2-85:a-failed-approval-cannot-display-a-confirmed-booking",
       "SG2-84:deadline-refresh-waits-for-an-in-flight-approval-and-preserves-the-saved-booking",
-      "SG2-84:staff-approve-a-live-hold-through-its-booking-request-and-release-a-second-hold"
+      "SG2-84:staff-approve-a-live-hold-through-its-booking-request-and-release-a-second-hold",
+      "SG2-84:reg-converted-p01-a-converted-hold-keeps-its-receipt-after-its-own-booking-is-released"
     ],
     "source_sql_contract_ids": [
       "SG2-84:linked-conversion-fixture",
@@ -6911,7 +6912,9 @@
       "SG2-81:replacement-retires-converted-hold-request",
       "SG2-81:replaced-held-venue-no-phantom-demand",
       "SG2-84:converted-booking-missing-or-timer-changed-it",
-      "SG2-58:hold-requests-linked-and-released"
+      "SG2-58:hold-requests-linked-and-released",
+      "SG2-85:deadline-hold-was-approved",
+      "SG2-84:finished-booking-period-was-converted"
     ],
     "source_sql_aliases": {
       "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
@@ -6927,6 +6930,18 @@
           "jsonPointer": "/179/reference_revisions/0/previous_record",
           "recordId": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
           "canonicalJsonSha256": "070bb27b45a326a5aec401e157054b977255b76c5757526c452ac9bd719a4afe"
+        }
+      },
+      {
+        "date": "2026-10-30",
+        "scope": "Labelling correction and one added browser test; no change to application behaviour.",
+        "reason": "Step 1 asked to refuse a \"missing booking path\" that no code or test has; reworded to the refusals actually tested and mapped the two SQL contracts that exercise them. Step 4 now names the receipt after its own booking is released, covered by new browser test REG-CONVERTED-P01.",
+        "previous_record_reference": {
+          "commit": "864c92e2077eabffe5a3166276d496466b363fda",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/864c92e2077eabffe5a3166276d496466b363fda/docs/regression-cases.json",
+          "jsonPointer": "/179",
+          "recordId": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
+          "canonicalJsonSha256": "f5d01ada0e7a17f27f5f252fda16b8b2c97c1018ae5905819067ffadb71c96a8"
         }
       }
     ],
