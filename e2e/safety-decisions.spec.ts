@@ -94,7 +94,7 @@ test('SG2-92-P01 | [NORMAL] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] 
   await expect(inbox.getByText(REJECTED, { exact: true })).toBeVisible();
 });
 
-test('SG2-92-P02 | [NORMAL] [SG2-92:AC4] [SG2-92:AC6] the coordinator sees the rejection and its reason, and reworks the event back to Planning', async ({ page }) => {
+test('SG2-92-P02 | [NORMAL] [SG2-92:AC4] [SG2-92:AC6] the coordinator sees the rejection and its reason, reworks the event back to Planning and resubmits it for a new check', async ({ page }) => {
   const safety = await auth(page, 'safety');
   expect((await page.request.post('/api/event-requests/922/safety-decision', { headers: safety,
     data: { decision: 'reject', reason: 'Crowd flow blocks the east fire exit', safety_check_revision: 1 } })).status()).toBe(201);
@@ -110,10 +110,17 @@ test('SG2-92-P02 | [NORMAL] [SG2-92:AC4] [SG2-92:AC6] the coordinator sees the r
   await summary.getByRole('button', { name: 'Rework arrangements', exact: true }).click();
   await expect(page.getByRole('article', { name: 'Event request' }).locator('.work-queue-status').first()).toHaveText('planning');
   await expect(page.getByRole('button', { name: 'Rework arrangements', exact: true })).toHaveCount(0);
-  const stored = await ledger(page);
-  expect(statusOf(stored, 922)).toBe('planning');
+  // The reworked event waits in Planning, off the Safety Officer's list, until the coordinator resubmits it.
+  let stored = await ledger(page);
+  const reworked = stored.events.find(row => row.event_id === 922);
+  expect(reworked).toMatchObject({ status: 'planning', outstanding_arrangements: ['safety_other_recheck'] });
+  await page.getByRole('button', { name: 'Mark other safety changes done', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Event request' }).locator('.work-queue-status').first()).toHaveText('awaiting safety check');
+  stored = await ledger(page);
+  expect(stored.events.find(row => row.event_id === 922)).toMatchObject({ status: 'awaiting_safety_check', outstanding_arrangements: [],
+    safety_check_revision: Number(reworked?.safety_check_revision) + 1 });
   expect(stored.audit.filter(row => row.event_id === 922 && row.field_name === 'status').map(row => [row.old_value, row.new_value]))
-    .toEqual([['awaiting_safety_check', 'safety_rejected'], ['safety_rejected', 'planning']]);
+    .toEqual([['awaiting_safety_check', 'safety_rejected'], ['safety_rejected', 'planning'], ['planning', 'awaiting_safety_check']]);
 });
 
 test('SG2-92-N01 | [FAILURE] [CONFLICT] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC4] only the Safety Officer decides, only once per check, and only with what each decision needs', async ({ page }) => {

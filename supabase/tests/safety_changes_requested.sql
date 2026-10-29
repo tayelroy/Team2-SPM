@@ -24,7 +24,7 @@ insert into public.equipment(equipment_id,name,quantity_total) values (99301,'Ch
 insert into public.events(event_id,organiser_id,coordinator_id,name,status,proposed_date,expected_attendance)
  select 99300+n,'d9300000-0000-4000-8000-000000000001','d9300000-0000-4000-8000-000000000002',
   'Changes event '||n,'planning','2031-11-01T10:00Z',120
- from generate_series(1,6) n;
+ from generate_series(1,7) n;
 
 -- Everything SG2-91 needs, written in the order that leaves the event
 -- awaiting its check: equipment placed and reserved first (no venue yet, so
@@ -286,6 +286,76 @@ do $$
 begin
  if exists(select 1 from public.safety_rereviews where event_id=99305) or pg_temp.keys(99305) is distinct from '[]'::jsonb then
   raise exception '[SG2-93:approve-flags-nothing] [SG2-93:AC3] [BOUNDARY] An approval must flag nothing and leave nothing outstanding';
+ end if;
+end $$;
+
+-- SG2-92 AC4: a reworked event waits in Planning until its coordinator
+-- resubmits it by marking Other done; it then goes back to the check once its
+-- venue and equipment are in place (99306 ready, 99307 venue re-requested).
+select pg_temp.ready(99306, false), pg_temp.ready(99307, false);
+grant execute on function pg_temp.status(integer), pg_temp.keys(integer) to service_role;
+set local role service_role;
+select public.record_safety_decision(e,'d9300000-0000-4000-8000-000000000005','reject','Blocked fire exit',null,pg_temp.rev(e))
+ from unnest(array[99306,99307]) e;
+reset role;
+update public.events set outstanding_arrangements='["registration"]', arrangements_recheck_needed=true where event_id=99307;
+set local role service_role;
+do $$
+declare result jsonb;
+begin
+ result := public.rework_safety_rejected_event(99306,'d9300000-0000-4000-8000-000000000002');
+ if result is distinct from '{"outcome":"ok","status":"planning"}'::jsonb
+   or pg_temp.status(99306) is distinct from 'planning'
+   or pg_temp.keys(99306) is distinct from '["safety_other_recheck"]'::jsonb
+   or (select arrangements_recheck_needed from public.events where event_id=99306) is not true then
+  raise exception '[SG2-92:rework-resubmit-gate] [SG2-92:AC4] [NORMAL] Rework must leave Other outstanding so the ready event waits for its coordinator: % %', result, pg_temp.keys(99306);
+ end if;
+ perform public.rework_safety_rejected_event(99307,'d9300000-0000-4000-8000-000000000002');
+ if pg_temp.keys(99307) is distinct from '["registration","safety_other_recheck"]'::jsonb then
+  raise exception '[SG2-92:rework-keeps-keys] [SG2-92:AC4] [BOUNDARY] Rework must keep the rechecks already outstanding: %', pg_temp.keys(99307);
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ -- An unrelated arrangement write runs SG2-91's refresh.
+ update public.venue_bookings set ends_at = ends_at where event_id=99306;
+ if pg_temp.status(99306) is distinct from 'planning' then
+  raise exception '[SG2-92:rework-not-requeued] [SG2-92:AC4] [CONFLICT] A reworked event must stay off the Safety Officer''s list until it is resubmitted';
+ end if;
+end $$;
+set local role service_role;
+do $$
+declare result jsonb; before_rev bigint := pg_temp.rev(99306);
+begin
+ result := public.settle_arrangement_recheck(99306,'d9300000-0000-4000-8000-000000000006','safety_other_recheck');
+ if result is distinct from '{"outcome":"stale"}'::jsonb or pg_temp.status(99306) is distinct from 'planning' then
+  raise exception '[SG2-92:resubmit-coordinator-only] [SG2-92:AC4] [FAILURE] Only the assigned coordinator resubmits a reworked event: %', result;
+ end if;
+ result := public.settle_arrangement_recheck(99306,'d9300000-0000-4000-8000-000000000002','safety_other_recheck');
+ if result is distinct from '{"outcome":"ok","arrangements_recheck_needed":false,"outstanding_arrangements":[]}'::jsonb
+   or pg_temp.status(99306) is distinct from 'awaiting_safety_check' or pg_temp.rev(99306) <= before_rev then
+  raise exception '[SG2-92:resubmit-ready] [SG2-92:AC4] [NORMAL] Resubmitting a ready reworked event must return it to Awaiting Safety Check with a new revision: % %', result, pg_temp.status(99306);
+ end if;
+end $$;
+reset role;
+update public.venue_booking_requests set status='pending' where event_id=99307;
+update public.events set outstanding_arrangements='["safety_other_recheck"]' where event_id=99307;
+set local role service_role;
+do $$
+declare result jsonb;
+begin
+ result := public.settle_arrangement_recheck(99307,'d9300000-0000-4000-8000-000000000002','safety_other_recheck');
+ if result->>'outcome' is distinct from 'ok' or pg_temp.status(99307) is distinct from 'planning' then
+  raise exception '[SG2-92:resubmit-venue-outstanding] [SG2-92:AC4] [BOUNDARY] A resubmitted event whose venue is still outstanding must stay in Planning: % %', result, pg_temp.status(99307);
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ update public.venue_booking_requests set status='approved' where event_id=99307;
+ if pg_temp.status(99307) is distinct from 'awaiting_safety_check' then
+  raise exception '[SG2-92:resubmit-venue-later] [SG2-92:AC4] [NORMAL] A resubmitted event must reach Awaiting Safety Check once its venue is in place';
  end if;
 end $$;
 

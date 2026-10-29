@@ -7372,7 +7372,7 @@
   },
   {
     "id": "SG2-92-P02",
-    "title": "The coordinator sees the rejection and its reason, and reworks the event back to Planning",
+    "title": "The coordinator sees the rejection and its reason, reworks the event back to Planning and resubmits it for a new check",
     "type": "NORMAL",
     "story": "SG2-92",
     "categories": [
@@ -7386,10 +7386,11 @@
     "preconditions": "Same fixture as SG2-92-P01; Riverside Fair rejected through the API by the Safety Officer at safety_check_revision 1.",
     "steps": [
       "Sign in as coordinator at 390px and open Riverside Fair from My assigned events.",
-      "Read the latest safety decision, then choose Rework arrangements."
+      "Read the latest safety decision, then choose Rework arrangements.",
+      "Choose Mark other safety changes done to resubmit the reworked event."
     ],
     "data": "Event 922; reason 'Crowd flow blocks the east fire exit'.",
-    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning, removes the button, and the history has awaiting_safety_check\u2192safety_rejected then safety_rejected\u2192planning.",
+    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning with safety_other_recheck outstanding and removes the button; marking other safety changes done returns it to awaiting_safety_check with a new revision, and the history has awaiting_safety_check\u2192safety_rejected, safety_rejected\u2192planning, then planning\u2192awaiting_safety_check.",
     "evidence": "e2e/safety-decisions.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
