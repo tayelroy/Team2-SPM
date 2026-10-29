@@ -32,6 +32,12 @@ export default function CancellationPanel({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const statusLower = status.toLowerCase();
+
+  // Match the server's closed-state guard before offering either role a step,
+  // even if a stale cancellation request remains on the event. Cancelled
+  // events still render their final receipt below.
+  if (['draft', 'rejected', 'completed'].includes(statusLower)) return null;
 
   const ask = async () => {
     const trimmed = draft.trim();
@@ -63,7 +69,7 @@ export default function CancellationPanel({
   };
 
   let body;
-  if (status === 'cancelled') {
+  if (statusLower === 'cancelled') {
     // AC4/AC5: the cancellation is final and says why.
     body = <p role="status" className="organisation-detail-description">
       {`This event was cancelled${cancelledAt ? ` on ${formatSgtTimestamp(cancelledAt)}` : ''}.`}

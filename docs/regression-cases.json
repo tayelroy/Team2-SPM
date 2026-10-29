@@ -10264,5 +10264,35 @@
     "status": "Pass",
     "execution_date": "29 Oct 2026",
     "actual": "Passed in the complete 192-case local browser run; screenshots attached directly to the PR draft."
+  },
+  {
+    "id": "SG2-67-CLOSED-390",
+    "title": "closed events hide cancellation actions on phone and cancelled receipts remain final",
+    "type": "Positive / Negative",
+    "story": "SG2-67",
+    "categories": ["NORMAL", "BOUNDARY", "CONFLICT"],
+    "mapped_acs": ["SG2-67:AC1", "SG2-67:AC4", "SG2-67:AC5"],
+    "steps": ["Open own draft, rejected, completed and cancelled records at 390px", "Verify no cancellation form or action on any closed state", "Verify the cancelled receipt retains its exact time and reason", "Open planning and safety-rejected records and verify cancellation is offered", "Check no cancellation mutation and no horizontal overflow"],
+    "expected": "Closed states offer no cancellation action; cancelled receipts stay visible; planning and safety rejection remain active.",
+    "evidence": "e2e/cancellation-states.spec.ts; client/src/components/CancellationPanel.test.tsx; client/src/screens/EventDetail.cancellation.test.tsx",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "execution_date": "29 Oct 2026",
+    "actual": "Passed the 390px browser regression with real captures for all six states; component matrix also covers both roles, stale requests and legacy receipts."
+  },
+  {
+    "id": "SG2-67-CLOSED-1440",
+    "title": "closed events hide cancellation actions on desktop and cancelled receipts remain final",
+    "type": "Positive / Negative",
+    "story": "SG2-67",
+    "categories": ["NORMAL", "BOUNDARY", "CONFLICT"],
+    "mapped_acs": ["SG2-67:AC1", "SG2-67:AC4", "SG2-67:AC5"],
+    "steps": ["Repeat the six-state cancellation visibility journey at 1440px", "Verify final timestamp and reason, no forbidden form or action, no mutations and no overflow"],
+    "expected": "Desktop follows the same closed-state rules as phone without suppressing active-state cancellation.",
+    "evidence": "e2e/cancellation-states.spec.ts; test-results/release-evidence/cancellation-*-1440.png",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "execution_date": "29 Oct 2026",
+    "actual": "Passed the 1440px browser regression with real captures for all six states."
   }
 ]

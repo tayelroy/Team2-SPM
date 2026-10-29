@@ -8,7 +8,7 @@ equipment, tells its registered attendees, and is final.
 
 | Method and path | Who | Body | Outcomes |
 | --- | --- | --- | --- |
-| `POST /api/event-requests/:eventId/cancellation-request` | the organiser who created the event (`event_request.cancellation.request`) | `{ "reason": "…" }` (1–500 characters after trimming) | 201 requested; 400 no valid reason; 404 not their event; 409 `closed` (draft, completed or cancelled) or `requested` (already asked) |
+| `POST /api/event-requests/:eventId/cancellation-request` | the organiser who created the event (`event_request.cancellation.request`) | `{ "reason": "…" }` (1–500 characters after trimming) | 201 requested; 400 no valid reason; 404 not their event; 409 `closed` (draft, rejected, completed or cancelled) or `requested` (already asked) |
 | `PATCH /api/event-requests/:eventId/cancel` | the assigned coordinator (`event_request.cancel`) | none | 200 cancelled, with `bookings_released` and `attendees_notified`; 404 not their event; 409 `not_requested` or `closed` |
 
 Every other role gets 403 from the route permission, and the database rechecks
@@ -20,6 +20,11 @@ queue, whose event details now carry `cancellation_requested_at` and
 cancel" form on the event page, and the coordinator's "Cancel event" step,
 with a confirmation, in the work queue. A cancelled event leaves the
 coordinator's queue.
+
+Draft, rejected and completed events hide the cancellation panel for both
+roles, including when an old request is recorded. Cancelled events retain
+their read-only final receipt; no closed state offers a cancellation action.
+Safety-rejected events remain active and can still request cancellation.
 
 ## Migration `202610220002_event_cancellation.sql`
 
