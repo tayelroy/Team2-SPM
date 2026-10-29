@@ -84,6 +84,14 @@ function sentDraftBody(fetchMock: ReturnType<typeof vi.fn>) {
 
 // ─── AC2: Submit button disabled state ──────────────────────────────────────
 
+test('[NORMAL] [SG2-96:release-layout] request guidance precedes the fields in reading order', () => {
+  render(<RequestForm {...DEFAULT_PROPS} />);
+  const guidance = screen.getByText('What happens next');
+  const firstField = screen.getByLabelText(/Event name/i);
+  expect(guidance.compareDocumentPosition(firstField) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
 describe('AC2 — submit button disabled until all fields are filled', () => {
   test.each(['Event name', 'Purpose', 'Date', 'Expected attendance', 'Venue requirements', 'Description',
     'Preferred room layout', 'Accessibility needs', 'Equipment requirements'])(

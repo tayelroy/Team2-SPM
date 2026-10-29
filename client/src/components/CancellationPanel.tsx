@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { cancelEvent, requestCancellation } from '../api/eventCancellation';
+import { cancelEvent, requestCancellation, type EventCancelled } from '../api/eventCancellation';
 import { formatSgtTimestamp } from './EventAuditDrawer';
 
 export interface CancellationPanelProps {
@@ -13,6 +13,8 @@ export interface CancellationPanelProps {
   cancelledAt: string | null;
   /** Reloads the event after a request or a cancellation. */
   onChanged: () => void;
+  /** Keep the server's final timestamp when the event leaves active work. */
+  onCancelled?: (result: EventCancelled) => void;
 }
 
 const MAX_REASON = 500;
@@ -23,7 +25,7 @@ const MAX_REASON = 500;
  * decides every outcome; this panel only offers the step that fits.
  */
 export default function CancellationPanel({
-  eventId, accessToken, mode, status, requestedAt, reason, cancelledAt, onChanged
+  eventId, accessToken, mode, status, requestedAt, reason, cancelledAt, onChanged, onCancelled
 }: CancellationPanelProps) {
   const fieldId = useId();
   const [draft, setDraft] = useState('');
@@ -50,7 +52,10 @@ export default function CancellationPanel({
     setError(null);
     const result = await cancelEvent(eventId, accessToken);
     setBusy(false);
-    if (result.ok) onChanged();
+    if (result.ok) {
+      onCancelled?.(result.value);
+      onChanged();
+    }
     else {
       setConfirming(false);
       setError(result.message);
@@ -60,7 +65,7 @@ export default function CancellationPanel({
   let body;
   if (status === 'cancelled') {
     // AC4/AC5: the cancellation is final and says why.
-    body = <p className="organisation-detail-description">
+    body = <p role="status" className="organisation-detail-description">
       {`This event was cancelled${cancelledAt ? ` on ${formatSgtTimestamp(cancelledAt)}` : ''}.`}
       {reason ? ` Reason: ${reason}` : ''} A similar event needs a new request.
     </p>;

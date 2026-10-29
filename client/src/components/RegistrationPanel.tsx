@@ -10,6 +10,7 @@ import {
 import type { RegistrationWindow } from '../api/eventConfirmation';
 import { isoToSgtLocal, sgtToIso } from '../venues/searchApi';
 import { formatSgtTimestamp } from './EventAuditDrawer';
+import { terminalEventStatus, TERMINAL_REGISTRATION_STATE } from '../eventLifecycle';
 
 type Props = { eventId: number; accessToken: string };
 
@@ -79,9 +80,10 @@ function Picture({ view, eventId, accessToken, onChanged }: {
 }) {
   if (!view.registration_needed) return <p className="organisation-detail-hint">{REGISTRATION_STATE.not_required}</p>;
   const time = (iso: string | null) => (iso ? formatSgtTimestamp(iso) : 'Not set');
+  const terminal = terminalEventStatus(view.status);
   return (
     <>
-      <p className="registration-state" data-window={view.window}>{REGISTRATION_STATE[view.window]}</p>
+      <p className="registration-state" data-window={view.window}>{terminal === null ? REGISTRATION_STATE[view.window] : TERMINAL_REGISTRATION_STATE[terminal]}</p>
       <dl className="registration-facts">
         <div><dt>Registered</dt><dd data-testid="registration-count">{view.registered_count}</dd></div>
         <div><dt>Capacity</dt><dd>{view.registration_capacity ?? 'Not set'}</dd></div>

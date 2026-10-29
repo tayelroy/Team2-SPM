@@ -169,12 +169,12 @@ test('[FAILURE] [SG2-23:AC2] invalid credentials show a generic error and keep y
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-23:AC1] an attendee lands on the event page rather than a dashboard', async () => {
+test('[NORMAL] [SG2-23:AC1] [SG2-59:AC1] an attendee lands on the authenticated event catalogue', async () => {
   await signInAs('Attendee');
-  expect(screen.getByRole('heading', { name: 'Event page' })).toBeInTheDocument();
-  expect(
-    screen.getByRole('heading', { name: 'Northbridge Investor Forum' }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
+  expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
+  expect(screen.queryByText('J. Halloran')).not.toBeInTheDocument();
+  expect(screen.queryByText('Northbridge Investor Forum')).not.toBeInTheDocument();
 });
 
 describe('every role can reach every screen in its navigation', () => {
@@ -205,8 +205,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
-    // SG2-62: the real list of registrations replaced the prototype dashboard's name.
-    Attendee: [['Dashboard', 'Attendee home'], ['Find events', 'Find events'], ['My registrations', 'My registrations'], ['Event page', 'Event page']],
+    Attendee: [['Find events', 'Find events'], ['My registrations', 'My registrations']],
     // SG2-86: only the screens these roles can use; neither holds
     // event_request.view, so neither is offered All events.
     // SG2-97: assignment moved here from Technical Support Staff.
@@ -383,7 +382,7 @@ test.each([500, 503, 'offline'] as const)('[FAILURE] [SG2-23:session-resume] a %
 
 test.each([
   ['Venue Staff', 'Catalogue', 'Venue desk'],
-  ['Attendee', 'Find events', 'Event page'],
+  ['Attendee', 'My registrations', 'Find events'],
 ] as const)('[NORMAL] [SG2-23:session-resume] the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
   await signInAs(role);
   fireEvent.click(within(header()).getByRole('button', { name: destination }));
@@ -874,12 +873,11 @@ test('[NORMAL] [SG2-44:AC1] the calendar shows the month grid with real venue av
   expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-59:AC1] an attendee reaches the events open for registration from the menu and from Browse events', async () => {
+test('[NORMAL] [SG2-59:AC1] the attendee catalogue is home and remains reachable from the menu', async () => {
   await signInAs('Attendee');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
   expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
-  fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Browse events' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
   expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
 });
 
@@ -897,27 +895,45 @@ test('[FAILURE] [SG2-62:AC1] an attendee without the grant is not offered My reg
   expect(within(await loadedNav()).queryByRole('button', { name: 'My registrations' })).toBeNull();
 });
 
-test('[FAILURE] [SG2-59:AC1] an attendee without the grant is not offered Find events', async () => {
-  await signInAs('Attendee', ['profile.read']);
+test('[FAILURE] [SG2-86:AC4] [SG2-23:session-resume] an attendee without catalogue access has Profile as home, including wordmark and resume', async () => {
+  await signInAs('Attendee', ['profile.read', 'registrations.mine.read']);
   expect(within(await loadedNav()).queryByRole('button', { name: 'Find events' })).toBeNull();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My registrations' })).toBeVisible();
+  fireEvent.click(within(header()).getByRole('button', { name: 'ConnectSphere' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  cleanup();
+  render(<App />);
+  await loadedNav();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/auth/login')).toHaveLength(1);
 });
 
-test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-register', async () => {
+test('[NORMAL] [SG2-86:AC4] attendee navigation exposes the authenticated catalogue and registrations', async () => {
   await signInAs('Attendee');
-  expect(
-    screen.getByText("You're registered — confirmation sent to your email."),
-  ).toBeInTheDocument();
+  const labels = within(await loadedNav()).getAllByRole('button').map(button => button.textContent);
+  expect(labels).toEqual(['Find events', 'My registrations']);
+});
 
-  fireEvent.click(screen.getByRole('button', { name: 'Withdraw registration' }));
-  expect(
-    screen.getByText('Places are held as soon as you register.'),
-  ).toBeInTheDocument();
-  expect(screen.getByText('Not registered')).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Register' }));
-  expect(
-    screen.getByText("You're registered — confirmation sent to your email."),
-  ).toBeInTheDocument();
+test('[BOUNDARY] [SG2-86:AC4] an attendee waits for catalogue permission before opening the authenticated catalogue', async () => {
+  mockLoginResponse('Attendee');
+  const api = vi.mocked(fetch);
+  const existing = api.getMockImplementation()!;
+  let resolveAccess!: (response: Response) => void;
+  api.mockImplementation((...args) => args[0] === '/api/auth/me'
+    ? new Promise<Response>(resolve => { resolveAccess = resolve; })
+    : existing(...args));
+  render(<App />);
+  await submitSignIn();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(api.mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  await act(async () => resolveAccess(Response.json({ userId: 'user-1', role: 'attendee', permissions: ['events.registrable.read'] })));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Find events' })).toBeVisible();
+  expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toBeVisible();
 });
 
 
@@ -1081,7 +1097,9 @@ test('[NORMAL] [SG2-102:AC2] [SG2-102:AC4] an attendee opens an event change not
   fireEvent.click(await screen.findByRole('button', { name: /^Notifications \(/ }));
   expect(await screen.findByText('Event changed')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: `Unread: ${message}` }));
-  expect(await screen.findByRole('heading', { name: 'Harbour Lecture' })).toBeVisible();
+  // The catalogue the attendee came from also has an event-card heading with
+  // this name; the notification summary is the level-two heading.
+  expect(await screen.findByRole('heading', { level: 2, name: 'Harbour Lecture' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'View event details' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View my registrations' }));
   const registrations = await screen.findByRole('region', { name: 'My registrations' });
@@ -1107,4 +1125,29 @@ test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that r
   }
   expect(await screen.findByRole('heading', { level: 1, name: 'Venue desk' })).toBeInTheDocument();
   expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Venue Staff');
+});
+
+test('[FAILURE] [SG2-104:AC1] [SG2-86:AC4] switching to an attendee without catalogue access opens Profile and never requests the catalogue', async () => {
+  await signInAs('Event Coordinator');
+  cleanup();
+  const stored = JSON.parse(sessionStorage.getItem('connectsphere.session')!);
+  sessionStorage.setItem('connectsphere.session', JSON.stringify({ ...stored,
+    user: { ...stored.user, roles: ['Event Coordinator', 'Attendee'] } }));
+  mockLoginResponse('Attendee', ['profile.read']);
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Coordination desk' })).toBeVisible();
+  const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  try {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Acting as' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Attendee' }));
+  } finally {
+    if (scrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoView);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
+  await loadedNav();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Attendee');
 });

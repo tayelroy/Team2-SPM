@@ -112,6 +112,19 @@ describe('RegistrationPanel picture (SG2-63)', () => {
     expect(panel().queryByText('Registered attendees')).toBeNull();
   });
 
+  test.each([
+    ['cancelled', 'This event was cancelled. Registration is closed.'],
+    ['rejected', 'This event was rejected. Registration is unavailable.'],
+    ['completed', 'This event is completed. Registration is closed.'],
+  ])('[BOUNDARY] [SG2-63:AC1] a %s event shows its final registration state rather than promising confirmation', async (status, message) => {
+    serve(() => Response.json({ ...OWNER_VIEW, status, window: 'not_confirmed', can_edit: false }));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(panel().queryByText('Registration opens to attendees once the event is confirmed.')).not.toBeInTheDocument();
+    expect(panel().getByTestId('registration-count')).toHaveTextContent('2');
+    expect(panel().queryByRole('form', { name: 'Registration settings' })).not.toBeInTheDocument();
+  });
+
   test('[FAILURE] [SG2-63:AC3] someone with no part in the event sees no panel, and a failed read can be retried', async () => {
     serve(() => Response.json({ error: 'Event not found.' }, { status: 404 }));
     const { container } = render(<RegistrationPanel eventId={12} accessToken="token" />);

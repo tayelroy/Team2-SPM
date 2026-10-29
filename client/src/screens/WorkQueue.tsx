@@ -15,6 +15,7 @@ import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import SafetyRereviewQueue from '../components/SafetyRereviewQueue';
 import RegistrationPanel from '../components/RegistrationPanel';
 import CancellationPanel from '../components/CancellationPanel';
+import { terminalEventStatus } from '../eventLifecycle';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
 import { BookingRequestConflicts } from '../venues/BookingConflicts';
@@ -225,12 +226,13 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
   const [arrangementsRevision, setArrangementsRevision] = useState(0);
   // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
   const [confirmedNotice, setConfirmedNotice] = useState('');
+  const [cancelledAt, setCancelledAt] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentStatus(status);
   }, [status]);
 
-  const isTerminal = ['cancelled', 'completed', 'rejected'].includes(currentStatus.toLowerCase());
+  const isTerminal = terminalEventStatus(currentStatus) !== null;
   const canEditPlanning = item.kind === 'event' && item.assigned_to_me && !isTerminal;
   const canDecide = item.kind === 'event' && item.assigned_to_me && currentStatus === 'under_review';
   // SG2-36: while reviewing, the coordinator can ask instead of deciding; once
@@ -315,7 +317,8 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
         <RegistrationPanel eventId={item.event_id} accessToken={accessToken} />
       )}
       {/* SG2-67 AC1: the organiser's request to cancel, which only the assigned
-          coordinator carries out; a cancelled event then leaves the queue. */}
+          coordinator carries out. Keep the final receipt until they go back:
+          re-reading an event removed from active work would turn success into a 404. */}
       {item.kind === 'event' && item.assigned_to_me && accessToken && (
         <CancellationPanel
           eventId={item.event_id}
@@ -324,8 +327,9 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
           status={currentStatus}
           requestedAt={typeof currentDetails.cancellation_requested_at === 'string' ? currentDetails.cancellation_requested_at : null}
           reason={typeof currentDetails.cancellation_reason === 'string' ? currentDetails.cancellation_reason : null}
-          cancelledAt={null}
-          onChanged={onReload}
+          cancelledAt={cancelledAt}
+          onCancelled={result => setCancelledAt(result.cancelledAt)}
+          onChanged={() => setStatus('cancelled')}
         />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}

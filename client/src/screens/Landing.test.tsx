@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Landing from './Landing';
 
-// Scroll geometry and canvas rendering have their own public hook tests.
-vi.mock('../hooks/useInertiaScroll', () => ({ useInertiaScroll: () => null }));
+// Canvas rendering has its own public hook tests; native scroll geometry is
+// verified by the browser release-layout suite.
 beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 

@@ -1,0 +1,19 @@
+DM Sans, regular (400) and medium (500)
+
+These are unmodified fonts from the official Google Fonts stylesheet used by
+the application's original design:
+https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap
+
+Regular:
+https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAopxhTg.ttf
+
+Medium:
+https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAkJxhTg.ttf
+
+License: SIL Open Font License 1.1, reproduced in OFL.txt.
+Official license source:
+https://raw.githubusercontent.com/google/fonts/main/ofl/dmsans/OFL.txt
+
+The font files are bundled with the application. Its stylesheet does not make
+runtime requests to Google Fonts or Google Static. font-display: swap keeps
+the system fallback readable during local font loading or a failed request.

@@ -126,7 +126,7 @@ test('PW-AUTH-01 | [SG2-23:AC1] [SG2-24:AC1] [NORMAL] each seeded role reaches i
     { account: 'coordinator', role: 'Event Coordinator', action: 'Venues' },
     { account: 'venue', role: 'Venue Staff', action: 'Catalogue' },
     { account: 'support', role: 'Technical Support Staff', action: 'Equipment' },
-    { account: 'attendee', role: 'Attendee', action: 'Event page' },
+    { account: 'attendee', role: 'Attendee', action: 'Find events' },
   ];
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -2091,7 +2091,10 @@ test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prot
   await expect(prototypeEvent).toHaveCount(0);
   await page.getByRole('button', { name: 'Open unassigned queue', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Unassigned queue' })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: 'Event page' })).toHaveCount(0);
+  // The retired prototype Event page is gone; the real attendee destinations
+  // remain absent from the Lead's permission-scoped navigation.
+  await expect(menu.filter({ hasText: /^Find events$/ })).toHaveCount(0);
+  await expect(menu.filter({ hasText: /^My registrations$/ })).toHaveCount(0);
 });
 
 test('SG2-87-P01 | [SG2-87:AC1] [SG2-87:AC2] [SG2-87:AC3] [SG2-87:AC4] [SG2-87:AC5] [NORMAL] [FAILURE] a submitted request waits in the Lead\'s unassigned queue until it is assigned', async ({ page, request }) => {
