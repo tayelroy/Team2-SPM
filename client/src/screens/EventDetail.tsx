@@ -392,7 +392,7 @@ export default function EventDetail({
           {/* SG2-67: the creating organiser asks to cancel with a reason and sees
               the recorded cancellation; the coordinator acts from the work queue. */}
           {accessToken && detail.canManage
-            && !['draft', 'completed'].includes(detail.status.toLowerCase()) && (
+            && !['draft', 'rejected', 'completed'].includes(detail.status.toLowerCase()) && (
             <CancellationPanel
               eventId={detail.eventId}
               accessToken={accessToken}

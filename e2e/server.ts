@@ -586,6 +586,20 @@ app.post('/__e2e/lifecycle', (_req, res) => {
   database.seedLifecycle();
   res.status(204).end();
 });
+// Fixed closed-state records for cancellation visibility regressions. This
+// composition root only serves the loopback, resettable in-memory fixture.
+app.post('/__e2e/cancellation-states', (_req, res) => {
+  for (const [index, status] of ['draft', 'rejected', 'completed', 'cancelled', 'planning', 'safety_rejected'].entries()) {
+    database.tables.events.push({
+      ...database.tables.events[0], event_id: 670 + index,
+      name: `Cancellation ${status}`, status, coordinator_id: 'user-coordinator',
+      cancellation_requested_at: ['completed', 'cancelled'].includes(status) ? '2026-10-21T01:00:00.000Z' : null,
+      cancellation_reason: ['completed', 'cancelled'].includes(status) ? 'The keynote speaker withdrew' : null,
+      cancelled_at: status === 'cancelled' ? '2026-10-21T02:30:00.000Z' : null,
+    });
+  }
+  res.status(204).end();
+});
 app.post('/__e2e/venue-holds', (_req, res) => {
   venueHolds.seed();
   res.status(204).end();

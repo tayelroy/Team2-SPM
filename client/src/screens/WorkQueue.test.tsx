@@ -685,7 +685,8 @@ test('[NORMAL] [SG2-49:AC1] [SG2-49:AC3] Venue Staff approve a ready venue reque
   fireEvent.click(approve);
   expect(await screen.findByText('Approved. The venue is committed to this event and the coordinator has been notified.')).toBeVisible();
   const detail = screen.getByRole('article', { name: 'Venue booking request' });
-  expect(within(detail).getByText('approved')).toBeVisible();
+  // The decision receipt renders before the parent status effect settles.
+  expect(await within(detail).findByText('approved')).toBeVisible();
   expect(fetch).toHaveBeenCalledWith('/api/venue-booking-requests/41/decision', expect.objectContaining({ method: 'POST' }));
 });
 

@@ -63,6 +63,8 @@ describe('EventDetail cancellation panel (SG2-67)', () => {
   test.each([
     ['a draft, which is deleted instead', 'Event Organiser' as const, { status: 'draft' }],
     ['a completed event', 'Event Organiser' as const, { status: 'completed' }],
+    ['a rejected event with an old cancellation request', 'Event Organiser' as const,
+      { status: 'REJECTED', cancellationRequestedAt: '2026-10-21T01:00:00Z', cancellationReason: 'Speaker withdrew' }],
     ['an organisation colleague who did not create it', 'Event Organiser' as const, { canManage: false }],
   ])('[BOUNDARY] [SG2-67:AC1] %s shows no cancellation panel', async (_label, role, override) => {
     renderAs(role, { ...detail, ...override });

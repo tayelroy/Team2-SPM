@@ -107,3 +107,52 @@ describe('CancellationPanel: the coordinator cancels (SG2-67 AC1, AC5)', () => {
     expect(screen.queryByLabelText('Reason for cancelling')).not.toBeInTheDocument();
   });
 });
+
+describe('CancellationPanel: closed states (SG2-67)', () => {
+  test.each(['draft', 'rejected', 'completed'])(
+    '[BOUNDARY] [CONFLICT] [SG2-67:AC1] %s offers no cancellation for either role, including a stale request', status => {
+      const ask = vi.spyOn(api, 'requestCancellation');
+      const cancel = vi.spyOn(api, 'cancelEvent');
+      for (const mode of ['organiser', 'coordinator'] as const) {
+        for (const metadata of [{ requestedAt: null, reason: null }, ASKED]) {
+          const { container, unmount } = render(<CancellationPanel {...base} {...metadata} mode={mode} status={status} />);
+          expect(container).toBeEmptyDOMElement();
+          expect(screen.queryByRole('button')).not.toBeInTheDocument();
+          expect(screen.queryByLabelText('Reason for cancelling')).not.toBeInTheDocument();
+          unmount();
+        }
+      }
+      expect(ask).not.toHaveBeenCalled();
+      expect(cancel).not.toHaveBeenCalled();
+    });
+
+  test.each(['rejected', 'completed', 'draft'])(
+    '[CONFLICT] [SG2-67:AC1] becoming %s closes an already-open coordinator confirmation', status => {
+      const cancel = vi.spyOn(api, 'cancelEvent');
+      const { rerender } = render(<CancellationPanel {...base} {...ASKED} mode="coordinator" />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel event' }));
+      expect(screen.getByRole('button', { name: 'Yes, cancel event' })).toBeInTheDocument();
+      rerender(<CancellationPanel {...base} {...ASKED} mode="coordinator" status={status} />);
+      expect(screen.queryByRole('region', { name: 'Cancellation' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(cancel).not.toHaveBeenCalled();
+    });
+
+  test.each(['organiser', 'coordinator'] as const)(
+    '[NORMAL] [FAILURE] [SG2-67:AC4] [SG2-67:AC5] %s retains the final cancelled receipt with or without historical metadata', mode => {
+      const { rerender } = render(<CancellationPanel {...base} {...ASKED} mode={mode} status="cancelled" cancelledAt="2026-10-21T02:30:00.000Z" />);
+      expect(screen.getByRole('status')).toHaveTextContent('This event was cancelled on 21 Oct 2026, 10:30 SGT. Reason: The keynote speaker withdrew');
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Reason for cancelling')).not.toBeInTheDocument();
+      rerender(<CancellationPanel {...base} mode={mode} status="CANCELLED" />);
+      expect(screen.getByRole('status')).toHaveTextContent('This event was cancelled. A similar event needs a new request.');
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
+  test.each(['under_review', 'planning', 'confirmed', 'safety_rejected'])(
+    '[NORMAL] [SG2-67:AC1] %s remains cancellable, including a safety rejection that needs rework', status => {
+      render(<CancellationPanel {...base} status={status} />);
+      expect(screen.getByRole('button', { name: 'Ask to cancel' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Reason for cancelling')).toBeInTheDocument();
+    });
+});
