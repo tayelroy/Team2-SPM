@@ -42,7 +42,7 @@ test.beforeEach(async ({ request, baseURL }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
 });
 
-test('UI-RELEASE-01 | [NORMAL] [SG2-22:AC3] the mobile and desktop landing footer remain reachable through native scrolling', async ({ page }) => {
+test('UI-RELEASE-01 | [NORMAL] [SG2-96:release-layout] the mobile and desktop landing footer remain reachable through native scrolling', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -84,7 +84,7 @@ test('UI-RELEASE-01 | [NORMAL] [SG2-22:AC3] the mobile and desktop landing foote
   expect(errors).toEqual([]);
 });
 
-test('UI-RELEASE-02 | [NORMAL] [SG2-22:AC3] authenticated mobile headers stay compact and the native nav row scrolls and clicks', async ({ page, request }) => {
+test('UI-RELEASE-02 | [NORMAL] [SG2-96:release-layout] authenticated mobile headers stay compact and the native nav row scrolls and clicks', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -137,7 +137,7 @@ test('UI-RELEASE-02 | [NORMAL] [SG2-22:AC3] authenticated mobile headers stay co
   expect(errors).toEqual([]);
 });
 
-test('UI-RELEASE-03 | [NORMAL] [SG2-22:AC3] venue editing and organiser requests use readable compact forms on desktop and mobile', async ({ page, request }) => {
+test('UI-RELEASE-03 | [NORMAL] [SG2-96:release-layout] venue editing and organiser requests use readable compact forms on desktop and mobile', async ({ page, request }) => {
   test.setTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

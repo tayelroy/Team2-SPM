@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ATTENDEE_ACTIONS, ATTENDEE_STATS } from '../mock/data';
-import type { EventCard, Role, Screen } from '../mock/types';
-import { eventCards } from '../mock/viewModel';
+import type { Role, Screen } from '../mock/types';
 import { color, radius, rule, surface } from '../theme';
 import {
   Badge,
   Card,
-  Dot,
   GhostButton,
   IconButton,
-  RecessedCard,
-  StatFigure,
 } from '../ui';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { fetchAssignmentQueue } from '../api/assignmentQueue';
@@ -19,72 +14,12 @@ import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
 
-/** One event summary in the left-hand list — the whole tile is the trigger. */
-function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      style={{
-        textAlign: 'left',
-        background: surface.sunken,
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: radius.card,
-        padding: '20px 22px',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <Badge bg={event.badgeBg} fg={event.badgeFg}>
-          {statusLabel(event.status)}
-        </Badge>
-        <span
-          style={{
-            fontSize: '10px',
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            color: color.slate,
-          }}
-        >
-          {event.ref}
-        </span>
-      </div>
-      <span
-        style={{
-          fontSize: '20px',
-          fontWeight: 500,
-          letterSpacing: '-0.01em',
-          color: color.platinum,
-        }}
-      >
-        {event.name}
-      </span>
-      <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
-        {event.meta}
-      </span>
-      <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.mist }}>
-        {event.next}
-      </span>
-    </button>
-  );
-}
-
 /**
  * Role-scoped landing view inside the app: headline figures, the events that
  * need attention, an action queue, and — for operational roles — the pipeline.
  */
 interface DashboardProps {
-  role: Role;
+  role: Exclude<Role, 'Attendee'>;
   accessToken?: string | null;
   onNavigate: (screen: Screen, eventId?: number) => void;
   /** SG2-46: open venue search pre-filled from an approved event. */
@@ -299,132 +234,5 @@ export default function Dashboard(props: DashboardProps) {
   if (role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
   if (isQueueRole(role)) return <WorkQueue key={`${role}:${props.accessToken}`} role={role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
   if (role === 'Event Coordinator Lead') return <LeadDashboard key={props.accessToken} {...props} />;
-  if (role === 'Safety Officer') return <SafetyDashboard key={props.accessToken} {...props} />;
-  return <AttendeeDashboard onNavigate={props.onNavigate} />;
-}
-
-/** The Attendee's dashboard: still the clickable prototype, by design. */
-function AttendeeDashboard({ onNavigate }: Pick<DashboardProps, 'onNavigate'>) {
-  const cards = eventCards().slice(0, 4);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-          gap: '20px',
-        }}
-      >
-        {ATTENDEE_STATS.map((stat) => (
-          <Card key={stat.label} padding="28px 30px" style={{ gap: '10px' }}>
-            <StatFigure value={stat.value} label={stat.label} />
-          </Card>
-        ))}
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,320px),1fr))',
-          gap: '20px',
-          alignItems: 'start',
-        }}
-      >
-        <Card style={{ gap: '24px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: '16px',
-            }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '24px',
-                fontWeight: 500,
-                lineHeight: 1.3,
-                letterSpacing: '-0.02em',
-                color: color.platinum,
-              }}
-            >
-              Events I can register for
-            </h2>
-            <IconButton label="See all events" onClick={() => onNavigate('events')}>
-              ↗
-            </IconButton>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {cards.map((event) => (
-              <EventTile
-                key={event.ref}
-                event={event}
-                onOpen={() => onNavigate('attendee')}
-              />
-            ))}
-          </div>
-        </Card>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <RecessedCard style={{ gap: '20px' }}>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '24px',
-                fontWeight: 500,
-                lineHeight: 1.3,
-                letterSpacing: '-0.02em',
-                color: color.platinum,
-              }}
-            >
-              Needs your attention
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {ATTENDEE_ACTIONS.map((action) => (
-                <div
-                  key={action.title}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '14px',
-                    paddingBottom: '14px',
-                    borderBottom: rule.faint,
-                  }}
-                >
-                  <Dot tone={action.dot} style={{ marginTop: '7px' }} />
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <span style={{ fontSize: '15px', color: color.platinum }}>
-                      {action.title}
-                    </span>
-                    <span
-                      style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}
-                    >
-                      {action.body}
-                    </span>
-                  </div>
-                  <IconButton
-                    label={`Open: ${action.title}`}
-                    onClick={() => onNavigate(action.screen)}
-                  >
-                    ↗
-                  </IconButton>
-                </div>
-              ))}
-            </div>
-          </RecessedCard>
-
-        </div>
-      </div>
-    </div>
-  );
+  return <SafetyDashboard key={props.accessToken} {...props} />;
 }

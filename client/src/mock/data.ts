@@ -2,86 +2,11 @@
 
 import { color } from '../theme';
 import type {
-  ActionItem,
   ContentScreen,
-  EventRecord,
   Role,
   Screen,
   Stat,
 } from './types';
-
-export const EVENTS: EventRecord[] = [
-  {
-    ref: 'E-205',
-    name: 'Product Launch — Tideline',
-    client: 'Meridian Capital',
-    status: 'Draft',
-    date: '20 Nov 2026',
-    venue: '—',
-    attendance: 300,
-    coordinator: 'Unassigned',
-    purpose:
-      'Public launch of the Tideline product line with press and partner attendance.',
-  },
-  {
-    ref: 'E-201',
-    name: 'Northbridge Investor Forum',
-    client: 'Meridian Capital',
-    status: 'Under review',
-    date: '12 Oct 2026',
-    venue: 'Kelp Room (proposed)',
-    attendance: 180,
-    coordinator: 'A. Vance',
-    purpose:
-      'A half-day forum for institutional partners: two keynotes, a panel, and a standing reception.',
-  },
-  {
-    ref: 'E-198',
-    name: 'Quarterly Partner Dinner',
-    client: 'Northbridge LLP',
-    status: 'Confirmed',
-    date: '3 Nov 2026',
-    venue: 'The Kelp Room',
-    attendance: 90,
-    coordinator: 'A. Vance',
-    purpose: 'Seated dinner for partner firms with a short address.',
-  },
-  {
-    ref: 'E-190',
-    name: 'Grad Recruitment Open Day',
-    client: 'Internal — People',
-    status: 'Planning',
-    date: '28 Sep 2026',
-    venue: 'Atrium Hall',
-    attendance: 240,
-    coordinator: 'R. Okafor',
-    purpose:
-      'Campus recruitment day: talks, stands, and interviews across the morning.',
-  },
-  {
-    ref: 'E-186',
-    name: 'Board Strategy Offsite',
-    client: 'Internal — Exec',
-    status: 'Approved',
-    date: '15 Oct 2026',
-    venue: 'Meridian Studio',
-    attendance: 24,
-    coordinator: 'A. Vance',
-    purpose: 'Closed-door strategy session with catering and AV recording.',
-  },
-  {
-    ref: 'E-181',
-    name: 'Community Sponsorship Night',
-    client: 'Harbour Trust',
-    status: 'Rejected',
-    date: '9 Sep 2026',
-    venue: '—',
-    attendance: 400,
-    coordinator: 'R. Okafor',
-    purpose:
-      'Sponsorship showcase evening; no venue of sufficient capacity was free.',
-  },
-];
 
 /**
  * A nav item: the screen it opens, its label and, optionally, the server
@@ -155,7 +80,7 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
 };
 
 export const HEAD: Record<
-  Role,
+  Exclude<Role, 'Attendee'>,
   { eyebrow: string; title: string; blurb: string }
 > = {
   'Event Organiser': {
@@ -182,12 +107,6 @@ export const HEAD: Record<
     blurb:
       'Equipment requests and reservations for your team. Open a request to review stock and placement.',
   },
-  Attendee: {
-    eyebrow: 'Attendee',
-    title: 'Attendee home',
-    blurb:
-      "Events you can register for and the ones you're already on the list for.",
-  },
   'Event Coordinator Lead': {
     eyebrow: 'Event Coordinator Lead',
     title: 'Coordination lead desk',
@@ -212,7 +131,6 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   holds: 'Venue holds',
   equipment: 'Equipment records',
   capacityExceptions: 'Capacity exceptions',
-  attendee: 'Event page',
   drafts: 'My draft requests',
   editDraft: 'Edit draft request',
   profile: 'My profile',
@@ -241,7 +159,6 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   capacityExceptions: 'Approve capacity exceptions for pending requests and booked venues whose attendance was raised. Approval does not reserve a venue or decide its booking.',
   equipment:
     'Keep equipment type, stock, location and operational status current for request assessment.',
-  attendee: 'Confirmed event details, registration, and your current status.',
   drafts:
     'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
   editDraft: 'Update the details, then save your changes or submit when ready.',
@@ -262,43 +179,11 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Every event you registered for and where each stands. Withdraw before an event starts to give your place back.',
 };
 
-/** Headline figures on the Attendee's prototype dashboard. */
-export const ATTENDEE_STATS: Stat[] = [
-  { value: '2', label: 'Registered' },
-  { value: '1', label: 'Waiting on confirmation' },
-  { value: '3', label: 'Open to register' },
-  { value: '0', label: 'Withdrawn' },
-];
-
-/** The Attendee's prototype "Needs your attention" items. */
-export const ATTENDEE_ACTIONS: ActionItem[] = [
-  {
-    title: 'Registration closes 8 Oct',
-    body: 'Northbridge Investor Forum — 42 places left.',
-    dot: color.accent,
-    screen: 'attendee',
-  },
-  {
-    title: 'Quarterly Partner Dinner is 3 Nov',
-    body: "You're registered. Venue: The Kelp Room.",
-    dot: color.teal,
-    screen: 'attendee',
-  },
-  {
-    title: 'Grad Recruitment Open Day',
-    body: "Registration isn't open yet — we'll let you know.",
-    dot: color.slate,
-    screen: 'dashboard',
-  },
-];
-
-export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
+export const PRIMARY_ACTION: Record<Exclude<Role, 'Attendee'>, { label: string; screen: Screen }> = {
   'Event Organiser': { label: 'New event request', screen: 'form' },
   'Event Coordinator': { label: 'Search venues', screen: 'venues' },
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },
   'Technical Support Staff': { label: 'Check availability', screen: 'equipment' },
-  // SG2-59: browsing goes to the real list of events open for registration.
-  Attendee: { label: 'Browse events', screen: 'findEvents' },
   // SG2-87/SG2-97: the Lead's dashboard summarises the unassigned queue;
   // its one call to action is the assignment screen.
   'Event Coordinator Lead': { label: 'Assign coordinators', screen: 'assign' },

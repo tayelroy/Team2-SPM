@@ -265,6 +265,9 @@ test('SG2-96-E2E02 | [NORMAL] [SG2-60:AC1] [SG2-62:AC2] mobile evidence shows at
 
 test('SG2-96-E2E03 | [NORMAL] [SG2-65:AC1] [SG2-65:AC2] mobile evidence shows coordinator refusal and acceptance', async ({ page }, info) => {
   test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.setViewportSize({ width: 390, height: 900 });
   const seedDecision = async () => {
     expect((await page.request.post('/__e2e/reset')).status()).toBe(204);
@@ -313,4 +316,5 @@ test('SG2-96-E2E03 | [NORMAL] [SG2-65:AC1] [SG2-65:AC2] mobile evidence shows co
   await expect(panel.getByRole('article')).toHaveCount(0);
   await expect(panel).toContainText('No change requests are waiting for your decision.');
   await evidence(page, info, 'week7-12-change-accepted-mobile-390', panel);
+  expect(errors).toEqual([]);
 });

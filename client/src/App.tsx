@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { isRole, type Role, type Screen } from './mock/types';
 import { clearSession, loadSession, saveSession } from './auth/session';
 import type { StoredSession } from './auth/session';
-import { loadAccess, type Access } from './auth/access';
+import { can, loadAccess, type Access } from './auth/access';
 import type { EventRequestDraft } from './api/eventRequests';
 import AppShell from './screens/AppShell';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
@@ -34,8 +34,7 @@ import { GhostButton } from './ui';
 
 /** The screen a signed-in user of a given role opens on. */
 function landingScreenFor(role: Role): Screen {
-  // Attendees start on the authenticated event catalogue. The old `attendee`
-  // screen was a static prototype with invented registrations and no API data.
+  // The requested home screen is resolved against loaded permissions below.
   return role === 'Attendee' ? 'findEvents' : 'dashboard';
 }
 
@@ -195,6 +194,11 @@ export default function App() {
   // `undefined` while this session's permissions are still loading.
   const access = loadedAccess?.token === session!.accessToken && loadedAccess.role === session!.user.role
     ? loadedAccess.access : undefined;
+  // An attendee without catalogue access still has a usable home. Resolve
+  // before mounting the page so login, session resume and role changes never
+  // send an unauthorized catalogue request while permissions are loading.
+  const effectiveScreen = role === 'Attendee' && screen === 'findEvents' && !can(access, 'events.registrable.read')
+    ? 'profile' : screen;
 
   const body = {
     notificationWork: <WorkQueue key={`${session!.accessToken}:${selectedEventId}`} role="Event Coordinator"
@@ -207,7 +211,7 @@ export default function App() {
         // SG2-102 AC4: an attendee's event details are on My registrations.
         : role === 'Attendee' ? () => setScreen('myRegistrations') : undefined}
       viewLabel={role === 'Attendee' ? 'View my registrations' : undefined} />,
-    dashboard: (
+    dashboard: role !== 'Attendee' && (
       <Dashboard
         role={role}
         accessToken={session!.accessToken}
@@ -287,9 +291,6 @@ export default function App() {
     holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
     capacityExceptions: <CapacityExceptions key={session!.accessToken} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
-    // Compatibility for an in-memory screen value retained by older code:
-    // render the authenticated catalogue, never the removed static prototype.
-    attendee: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />,
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
@@ -304,11 +305,11 @@ export default function App() {
     findEvents: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />,
     // SG2-62: an attendee sees and withdraws their registrations.
     myRegistrations: <MyRegistrations key={session!.accessToken} accessToken={session!.accessToken} />
-  }[screen];
+  }[effectiveScreen];
 
   return (
     <AppShell key={`${session!.accessToken}:${role}`} accessToken={session!.accessToken} role={role} roles={roles} onSwitchRole={handleSwitchRole}
-      access={access} screen={screen} onSignOut={handleSignOut}
+      access={access} screen={effectiveScreen} onSignOut={handleSignOut}
       onOpenNotification={(source, id) => { setNotificationTarget({ source, id }); setScreen('notificationEvent'); }} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event,
       // and the safety check list at the top (SG2-91).

@@ -126,18 +126,18 @@ describe('EventStageTracker (SG2-38)', () => {
   });
 
   test.each([
-    ['cancelled', 'Cancelled', 'Event cancelled.'],
-    ['completed', 'Completed', 'Event successfully concluded.'],
-    ['rejected', 'Rejected', 'Event request was not approved.'],
-    ['on_hold', 'On_hold', 'Event is currently on_hold.'],
-  ])('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC3] a %s stage without a next actor uses its actual description rather than claiming planning completed', (raw_status, name, description) => {
+    ['cancelled', 'Cancelled', 'Event cancelled.', false],
+    ['completed', 'Completed', 'Event successfully concluded.', false],
+    ['rejected', 'Rejected', 'Event request was not approved.', false],
+    ['on_hold', 'On_hold', 'Event is currently on_hold.', true],
+  ])('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC3] a %s stage without a next actor uses its actual description rather than claiming planning completed', (raw_status, name, description, recheckVisible) => {
     render(<EventStageTracker stage={{ ...mockPlanningStage, raw_status, stage: name, stage_key: raw_status, description, waiting_on: null }} />);
     expect(screen.getByTestId('stage-badge')).toHaveTextContent(name);
     expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('No active next step');
     expect(screen.getByTestId('waiting-on-action')).toHaveTextContent(description);
     expect(screen.queryByText('None (Planning completed)')).not.toBeInTheDocument();
     expect(screen.queryByText('No further actions pending. All lifecycle requirements are satisfied.')).not.toBeInTheDocument();
-    if (raw_status !== 'on_hold') expect(screen.queryByText('Arrangements Recheck Needed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Arrangements Recheck Needed') !== null).toBe(recheckVisible);
   });
 });
 

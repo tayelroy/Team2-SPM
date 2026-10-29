@@ -6,6 +6,7 @@ import {
   type PlanningUpdatePayload,
 } from '../api/eventRequests';
 import { loadSession } from '../auth/session';
+import { terminalEventStatus } from '../eventLifecycle';
 import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import {
@@ -258,7 +259,7 @@ function PlanningDrawerPanel({
   }, [feedback]);
 
   const statusLower = initialValues?.status?.toLowerCase() ?? '';
-  const isTerminal = ['cancelled', 'completed', 'rejected'].includes(statusLower);
+  const isTerminal = terminalEventStatus(statusLower) !== null;
   // SG2-66 AC6: once Confirmed or in Preparation, only whether registration is
   // needed and planning notes are edited here; everything else needs a change
   // request.

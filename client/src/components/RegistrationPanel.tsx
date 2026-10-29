@@ -10,6 +10,7 @@ import {
 import type { RegistrationWindow } from '../api/eventConfirmation';
 import { isoToSgtLocal, sgtToIso } from '../venues/searchApi';
 import { formatSgtTimestamp } from './EventAuditDrawer';
+import { terminalEventStatus, TERMINAL_REGISTRATION_STATE } from '../eventLifecycle';
 
 type Props = { eventId: number; accessToken: string };
 
@@ -20,12 +21,6 @@ export const REGISTRATION_STATE: Record<RegistrationWindow, string> = {
   not_yet_open: 'Registration has not opened yet.',
   open: 'Registration is open.',
   closed: 'Registration has closed.',
-};
-
-const TERMINAL_REGISTRATION_STATE: Record<string, string> = {
-  cancelled: 'This event was cancelled. Registration is closed.',
-  rejected: 'This event was rejected. Registration is unavailable.',
-  completed: 'This event is completed. Registration is closed.',
 };
 
 const MAX_CAPACITY = 2_147_483_647;
@@ -85,9 +80,10 @@ function Picture({ view, eventId, accessToken, onChanged }: {
 }) {
   if (!view.registration_needed) return <p className="organisation-detail-hint">{REGISTRATION_STATE.not_required}</p>;
   const time = (iso: string | null) => (iso ? formatSgtTimestamp(iso) : 'Not set');
+  const terminal = terminalEventStatus(view.status);
   return (
     <>
-      <p className="registration-state" data-window={view.window}>{TERMINAL_REGISTRATION_STATE[view.status] ?? REGISTRATION_STATE[view.window]}</p>
+      <p className="registration-state" data-window={view.window}>{terminal === null ? REGISTRATION_STATE[view.window] : TERMINAL_REGISTRATION_STATE[terminal]}</p>
       <dl className="registration-facts">
         <div><dt>Registered</dt><dd data-testid="registration-count">{view.registered_count}</dd></div>
         <div><dt>Capacity</dt><dd>{view.registration_capacity ?? 'Not set'}</dd></div>

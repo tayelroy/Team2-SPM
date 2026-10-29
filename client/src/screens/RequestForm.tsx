@@ -419,6 +419,21 @@ export default function RequestForm({
         alignItems: 'stretch',
       }}
     >
+      <RecessedCard style={{ gap: '16px' }}>
+        <Eyebrow>What happens next</Eyebrow>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '16px' }}>
+          {NEXT_STEPS.map((step) => (
+            <div key={step.n} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '13px', color: color.phosphor, flex: 'none', width: '18px' }}>
+                {step.n}
+              </span>
+              <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
+                {step.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </RecessedCard>
       <Card className="request-form-card" style={{ gap: '28px', minWidth: 0 }}>
         {/* Server-error alert banner (AC2) */}
         {submitStatus === 'error' && errorMessage && (
@@ -713,28 +728,6 @@ export default function RequestForm({
         </div>
       </Card>
 
-      <RecessedCard style={{ gap: '16px', order: -1 }}>
-        <Eyebrow>What happens next</Eyebrow>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '16px' }}>
-        {NEXT_STEPS.map((step) => (
-          <div key={step.n} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-            <span
-              style={{
-                fontSize: '13px',
-                color: color.phosphor,
-                flex: 'none',
-                width: '18px',
-              }}
-            >
-              {step.n}
-            </span>
-            <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
-              {step.text}
-            </span>
-          </div>
-        ))}
-        </div>
-      </RecessedCard>
     </div>
   );
 }

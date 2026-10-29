@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { HEAD, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
 import type { Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
-import type { Access } from '../auth/access';
+import { can, type Access } from '../auth/access';
 import { color, layout, radius, rule, surface } from '../theme';
 import { GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
@@ -141,8 +141,9 @@ export default function AppShell({
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
-  const head = HEAD[role];
+  const head = role === 'Attendee' ? undefined : HEAD[role];
   const primary = primaryActionFor(role);
+  const pageScreen = screen === 'dashboard' ? 'profile' : screen;
 
   useDismissOutside(profileOpen, profileRef, setProfileOpen);
 
@@ -172,7 +173,9 @@ export default function AppShell({
         >
           <button
             type="button"
-            onClick={() => onNavigate(role === 'Attendee' ? 'findEvents' : 'dashboard')}
+            onClick={() => onNavigate(role === 'Attendee'
+              ? can(access, 'events.registrable.read') ? 'findEvents' : 'profile'
+              : 'dashboard')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -341,7 +344,7 @@ export default function AppShell({
                 color: color.silver,
               }}
             >
-              {role === 'Event Organiser' ? 'Event Organiser' : head.eyebrow}
+              {role === 'Event Organiser' ? 'Event Organiser' : head?.eyebrow ?? role}
             </span>
             <h1
               style={{
@@ -353,11 +356,11 @@ export default function AppShell({
                 color: color.platinum,
               }}
             >
-              {screen === 'dashboard'
+              {screen === 'dashboard' && head
                 ? head.title
                 : role === 'Event Organiser' && screen === 'events'
                   ? 'Your events'
-                  : PAGE_TITLE[screen]}
+                  : PAGE_TITLE[pageScreen]}
             </h1>
             <p
               style={{
@@ -368,17 +371,17 @@ export default function AppShell({
                 maxWidth: '620px',
               }}
             >
-              {screen === 'dashboard'
+              {screen === 'dashboard' && head
                 ? head.blurb
                 : role === 'Event Organiser' && screen === 'events'
-                  ? head.blurb
+                  ? HEAD['Event Organiser'].blurb
                   : role === 'Event Organiser' && screen === 'detail'
                     ? 'View the event request, current status and coordinator details.'
-                    : PAGE_BLURB[screen]}
+                    : PAGE_BLURB[pageScreen]}
             </p>
           </div>
           {/* The primary CTA belongs to the dashboard only. */}
-          {screen === 'dashboard' ? (
+          {screen === 'dashboard' && primary ? (
             <GradientButton onClick={() => onNavigate(primary.screen)}>
               {primary.label}
             </GradientButton>

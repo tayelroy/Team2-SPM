@@ -72,18 +72,6 @@ test('[CONFLICT] [SG2-26:session-isolation] a late response for the previous ses
   expect(screen.getByText('Organisation events').closest('div')).toHaveTextContent('1');
 });
 
-test('[NORMAL] [SG2-20:prototype-dashboard] attendee retains its prototype event dashboard and navigation', () => {
-  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
-  const onNavigate = vi.fn();
-  render(<Dashboard role="Attendee" onNavigate={onNavigate} />);
-  expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: /Registration open.*Quarterly Partner Dinner/ }));
-  expect(onNavigate).toHaveBeenCalledWith('attendee');
-  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
-  expect(onNavigate).toHaveBeenCalledWith('events');
-  for (const button of screen.getAllByRole('button', { name: /^Open:/ })) fireEvent.click(button);
-});
-
 test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as awaiting assignment, not with a coordinator', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
     { event_id: 5, name: 'Queued forum', status: 'unassigned', can_manage: true, coordinator_id: null },

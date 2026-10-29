@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { EventStageResult } from '../api/eventRequests';
+import { terminalEventStatus } from '../eventLifecycle';
 import { color, gradient, radius, rule } from '../theme';
 import { Badge, Eyebrow } from '../ui';
 
@@ -108,7 +109,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
           </p>
         </div>
 
-        {stage.arrangements_recheck_needed && !['cancelled', 'rejected', 'completed'].includes(stage.raw_status) && (
+        {stage.arrangements_recheck_needed && terminalEventStatus(stage.raw_status) === null && (
           <Badge bg="rgba(255, 180, 0, 0.16)" fg="#fde047" size={11}>
             Arrangements Recheck Needed
           </Badge>

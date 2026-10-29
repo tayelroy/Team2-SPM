@@ -31,7 +31,6 @@ export type Screen =
   | 'holds'
   | 'capacityExceptions'
   | 'equipment'
-  | 'attendee'
   | 'drafts'
   | 'editDraft'
   | 'profile'
@@ -50,41 +49,6 @@ export type Screen =
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;
-
-export type EventStatus =
-  | 'Draft'
-  | 'Under review'
-  | 'Planning'
-  | 'Approved'
-  | 'Confirmed'
-  | 'Rejected';
-
-export interface EventRecord {
-  ref: string;
-  name: string;
-  client: string;
-  status: string;
-  date: string;
-  venue: string;
-  attendance: number;
-  coordinator: string;
-  purpose: string;
-}
-
-/** An event decorated for display: badge colours plus role-specific copy. */
-export interface EventCard extends EventRecord {
-  badgeBg: string;
-  badgeFg: string;
-  meta: string;
-  next: string;
-}
-
-export interface ActionItem {
-  title: string;
-  body: string;
-  dot: string;
-  screen: Screen;
-}
 
 export interface Stat {
   value: string;

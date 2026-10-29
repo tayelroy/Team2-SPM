@@ -1,11 +1,9 @@
-/** Presentation helpers for event status, role navigation and the attendee preview. */
+/** Presentation helpers for event status and role navigation. */
 
 import { color } from '../theme';
 import { can, type Access } from '../auth/access';
-import { EVENTS, NAV, PRIMARY_ACTION } from './data';
+import { NAV, PRIMARY_ACTION } from './data';
 import type {
-  EventCard,
-  EventRecord,
   Role,
   Screen,
 } from './types';
@@ -143,23 +141,6 @@ export function chipStyle(on: boolean): ChipStyle {
     : { bg: 'rgba(255,255,255,0.05)', bd: 'rgba(255,255,255,0.12)', fg: color.silver };
 }
 
-/** Confirmed sample events still used by the attendee dashboard. */
-export function scopedEvents(): EventRecord[] {
-  return EVENTS.filter((event) => event.status === 'Confirmed');
-}
-
-/** Registration cards for the attendee preview; staff dashboards use their APIs. */
-export function eventCards(): EventCard[] {
-  return scopedEvents().map((event) => ({
-    ...event,
-    badgeBg: 'rgba(255,255,255,0.09)',
-    badgeFg: color.mist,
-    status: 'Registration open',
-    meta: `${event.date} · ${event.venue}`,
-    next: 'Places available — registration closes a week before',
-  }));
-}
-
 /**
  * The role's nav items the signed-in account can use (SG2-86 AC2). An item
  * that names a permission is left out until `access` — the server's own
@@ -173,5 +154,5 @@ export function navFor(role: Role, access?: Access | null): { screen: Screen; la
 }
 
 export function primaryActionFor(role: Role) {
-  return PRIMARY_ACTION[role];
+  return role === 'Attendee' ? null : PRIMARY_ACTION[role];
 }

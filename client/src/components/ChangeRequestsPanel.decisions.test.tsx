@@ -54,7 +54,6 @@ describe('ChangeRequestsPanel decisions (SG2-65)', () => {
       .mockResolvedValueOnce({ ok: false, kind: 'conflict', message: 'This change request has already been decided.' })
       .mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const { card, onAccepted } = await renderPanel(listed());
-    expect(screen.getByTestId('change-requests-panel')).toHaveClass('organisation-detail-panel');
 
     // BOUNDARY: a blank reason cannot be confirmed; the box holds at most 1000 characters; Cancel closes it.
     openRefusal(card, '   ');

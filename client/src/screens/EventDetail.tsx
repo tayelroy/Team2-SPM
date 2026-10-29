@@ -14,6 +14,7 @@ import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import RegistrationPanel from '../components/RegistrationPanel';
 import CancellationPanel from '../components/CancellationPanel';
+import { terminalEventStatus } from '../eventLifecycle';
 import OrganiserChangeRequests from '../components/OrganiserChangeRequests';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
@@ -221,14 +222,14 @@ export default function EventDetail({
       const isRejected = detail.status.toLowerCase() === 'rejected';
       // SG2-36: the coordinator has asked a question and is waiting on the organiser.
       const needsClarification = detail.status.toLowerCase() === 'needs_clarification';
-      const isTerminal = ['cancelled', 'completed', 'rejected'].includes(detail.status.toLowerCase());
+      const isTerminal = terminalEventStatus(detail.status) !== null;
       const isLocked = isTerminal || !detail.waitingOnMe;
       // SG2-64 AC5: a request returned for clarification is answered in the
       // thread and changed through a change request, never edited directly.
       const canEditRequest = !isLocked && !needsClarification;
       // SG2-64 AC1/AC4: change requests on any submitted, still-open event.
       const canRequestChange = detail.canManage && Boolean(accessToken)
-        && !['draft', 'cancelled', 'rejected', 'completed'].includes(detail.status.toLowerCase());
+        && !isTerminal && detail.status.toLowerCase() !== 'draft';
 
       // SG2-36/SG2-64 AC5: once the question is answered, the organiser sends
       // the request back to review as it stands.
@@ -287,7 +288,7 @@ export default function EventDetail({
           {stage && (
             <div className="organisation-detail-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <EventStageTracker stage={stage} />
-              {stage.arrangements_recheck_needed && !['cancelled', 'rejected', 'completed'].includes(detail.status) && (
+              {stage.arrangements_recheck_needed && !isTerminal && (
                 <Notice
                   data-testid="arrangements-recheck-banner"
                   style={{

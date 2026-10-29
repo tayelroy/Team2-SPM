@@ -41,7 +41,7 @@ async function openForum() {
 }
 
 describe('work queue cancellation (SG2-67)', () => {
-  test('[NORMAL] [SG2-67:AC1] [SG2-67:AC5] a successful cancellation keeps its final receipt until returning to the empty queue', async () => {
+  test('[NORMAL] [SG2-67:AC1] [SG2-67:AC4] [SG2-67:AC5] a successful cancellation keeps its final timestamp and receipt until returning to the empty queue', async () => {
     let cancelled = false;
     const fetch = vi.fn(async (url: string) => {
       if (url.endsWith('/cancel')) {
@@ -56,7 +56,7 @@ describe('work queue cancellation (SG2-67)', () => {
     expect(within(pane).getByRole('region', { name: 'Cancellation' })).toHaveTextContent('The organiser asked to cancel this event');
     fireEvent.click(within(pane).getByRole('button', { name: 'Cancel event' }));
     fireEvent.click(within(pane).getByRole('button', { name: 'Yes, cancel event' }));
-    expect(await within(pane).findByRole('status')).toHaveTextContent('This event was cancelled. Reason: Speaker withdrew A similar event needs a new request.');
+    expect(await within(pane).findByRole('status')).toHaveTextContent('This event was cancelled on 29 Oct 2026, 15:00 SGT. Reason: Speaker withdrew A similar event needs a new request.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel event' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('work queue cancellation (SG2-67)', () => {
     expect(within(pane).queryByRole('region', { name: 'Cancellation' })).not.toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-67:AC1] refreshing an event removed elsewhere still reports that it left the queue', async () => {
+  test('[CONFLICT] [SG2-96:stale-work-item] refreshing an event removed elsewhere still reports that it left the queue', async () => {
     const fetch = vi.fn(async () => Response.json({ items: [asked] }));
     vi.stubGlobal('fetch', fetch);
     await openForum();

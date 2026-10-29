@@ -895,18 +895,45 @@ test('[FAILURE] [SG2-62:AC1] an attendee without the grant is not offered My reg
   expect(within(await loadedNav()).queryByRole('button', { name: 'My registrations' })).toBeNull();
 });
 
-test('[FAILURE] [SG2-59:AC1] an attendee without the grant is not offered Find events', async () => {
-  await signInAs('Attendee', ['profile.read']);
+test('[FAILURE] [SG2-86:AC4] [SG2-23:session-resume] an attendee without catalogue access has Profile as home, including wordmark and resume', async () => {
+  await signInAs('Attendee', ['profile.read', 'registrations.mine.read']);
   expect(within(await loadedNav()).queryByRole('button', { name: 'Find events' })).toBeNull();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My registrations' })).toBeVisible();
+  fireEvent.click(within(header()).getByRole('button', { name: 'ConnectSphere' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  cleanup();
+  render(<App />);
+  await loadedNav();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/auth/login')).toHaveLength(1);
 });
 
-test('[FAILURE] [SG2-59:AC1] attendee navigation exposes no obsolete prototype event or dashboard', async () => {
+test('[NORMAL] [SG2-86:AC4] attendee navigation exposes the authenticated catalogue and registrations', async () => {
   await signInAs('Attendee');
   const labels = within(await loadedNav()).getAllByRole('button').map(button => button.textContent);
   expect(labels).toEqual(['Find events', 'My registrations']);
-  expect(labels).not.toContain('Dashboard');
-  expect(labels).not.toContain('Event page');
-  expect(screen.queryByText('Northbridge Investor Forum')).not.toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-86:AC4] an attendee waits for catalogue permission before opening the authenticated catalogue', async () => {
+  mockLoginResponse('Attendee');
+  const api = vi.mocked(fetch);
+  const existing = api.getMockImplementation()!;
+  let resolveAccess!: (response: Response) => void;
+  api.mockImplementation((...args) => args[0] === '/api/auth/me'
+    ? new Promise<Response>(resolve => { resolveAccess = resolve; })
+    : existing(...args));
+  render(<App />);
+  await submitSignIn();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(api.mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  await act(async () => resolveAccess(Response.json({ userId: 'user-1', role: 'attendee', permissions: ['events.registrable.read'] })));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Find events' })).toBeVisible();
+  expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toBeVisible();
 });
 
 
@@ -1098,4 +1125,29 @@ test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that r
   }
   expect(await screen.findByRole('heading', { level: 1, name: 'Venue desk' })).toBeInTheDocument();
   expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Venue Staff');
+});
+
+test('[FAILURE] [SG2-104:AC1] [SG2-86:AC4] switching to an attendee without catalogue access opens Profile and never requests the catalogue', async () => {
+  await signInAs('Event Coordinator');
+  cleanup();
+  const stored = JSON.parse(sessionStorage.getItem('connectsphere.session')!);
+  sessionStorage.setItem('connectsphere.session', JSON.stringify({ ...stored,
+    user: { ...stored.user, roles: ['Event Coordinator', 'Attendee'] } }));
+  mockLoginResponse('Attendee', ['profile.read']);
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Coordination desk' })).toBeVisible();
+  const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  try {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Acting as' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Attendee' }));
+  } finally {
+    if (scrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoView);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
+  await loadedNav();
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeVisible();
+  expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Test User');
+  expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/registrable-events')).toHaveLength(0);
+  expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Attendee');
 });

@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
   badgeStyle,
-  eventCards,
   navFor,
   primaryActionFor,
-  scopedEvents,
   statusLabel,
   eventActionLabel,
   lockedRequestNotice,
@@ -21,24 +19,6 @@ describe('badgeStyle', () => {
     }
     expect(confirmed).not.toEqual(badgeStyle('Draft'));
     expect(confirmed).not.toEqual(badgeStyle('Under review'));
-  });
-});
-
-describe('scopedEvents', () => {
-  test('[NORMAL] [SG2-20:prototype-view-model] an attendee only sees confirmed events', () => {
-    expect(scopedEvents().map((event) => event.ref)).toEqual(['E-198']);
-  });
-});
-
-describe('eventCards', () => {
-  test('[NORMAL] [SG2-20:prototype-view-model] an attendee sees registration framing, not internal status', () => {
-    const cards = eventCards();
-    expect(cards).toMatchObject([{
-      ref: 'E-198',
-      status: 'Registration open',
-      next: 'Places available — registration closes a week before',
-      meta: '3 Nov 2026 · The Kelp Room',
-    }]);
   });
 });
 
@@ -98,7 +78,7 @@ describe('navFor / primaryActionFor (SG2-86)', () => {
     },
   );
 
-  test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-62:AC1] attendee navigation exposes only authenticated grants', () => {
+  test('[NORMAL] [FAILURE] [SG2-86:AC4] attendee navigation exposes only authenticated grants', () => {
     expect(navFor('Attendee')).toEqual([]);
     expect(navFor('Attendee', { userId: 'attendee-1', role: 'attendee', permissions: [] })).toEqual([]);
     expect(navFor('Attendee', { userId: 'attendee-1', role: 'attendee', permissions: ['events.registrable.read'] }))
@@ -113,6 +93,10 @@ describe('navFor / primaryActionFor (SG2-86)', () => {
   test('[NORMAL] [SG2-86:AC2] the Lead\'s primary action is assigning coordinators; the Safety Officer\'s is their profile', () => {
     expect(primaryActionFor('Event Coordinator Lead')).toEqual({ label: 'Assign coordinators', screen: 'assign' });
     expect(primaryActionFor('Safety Officer')).toEqual({ label: 'My profile', screen: 'profile' });
+  });
+
+  test('[NORMAL] [SG2-86:AC4] an attendee has no prototype dashboard primary action', () => {
+    expect(primaryActionFor('Attendee')).toBeNull();
   });
 });
 

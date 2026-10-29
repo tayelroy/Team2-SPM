@@ -4,9 +4,25 @@
  * controls, responsive layouts, the reset, fonts, keyframes and interaction states.
  */
 
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/dm-sans-regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/dm-sans-medium.ttf') format('truetype');
+}
+
 :root {
-  /* Keep text immediately readable without an external font download. */
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Bundle the existing brand face; the system fallback renders while it loads. */
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;

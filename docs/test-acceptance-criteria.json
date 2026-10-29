@@ -1078,6 +1078,16 @@
         "AC4": "The attendee-facing event details (SG2-59, SG2-62) show the updated information",
         "AC5": "Changes to internal planning information that attendees don't see do not trigger attendee notifications"
       }
+    },
+    {
+      "id": "SG2-96",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-96",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/123"
+      ],
+      "sourceReadDate": "2026-10-29",
+      "source": "Named supporting release contracts requested in Elroy's structured review of PR #123 on 29 October 2026. This entry registers the release-work story for supporting contracts only; it does not invent or claim numbered Jira acceptance criteria.",
+      "acceptanceCriteria": {}
     }
   ]
 }
