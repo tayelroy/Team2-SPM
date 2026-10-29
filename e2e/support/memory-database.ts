@@ -125,6 +125,8 @@ export class MemoryDatabase {
       ...this.tables.events[0], event_id: 52, name: 'Decision Forum', status: 'under_review',
       coordinator_id: 'user-coordinator', purpose: 'Decide whether the forum proceeds',
       decided_by: null, decided_at: null, decision_reason: null,
+      // Free text naming no known layout, so its venue search spans every layout (SG2-48).
+      preferred_layout: 'Rows facing the stage',
     });
   }
 
@@ -141,7 +143,9 @@ export class MemoryDatabase {
     );
     this.tables.events.push({
       ...this.tables.events[0], event_id: 61, name: 'Suitability Forum', status: 'approved', coordinator_id: 'user-coordinator',
-      expected_attendance: 150, venue_requirements: 'A stage and a projector', accessibility_needs: 'Needs a hearing loop'
+      expected_attendance: 150, venue_requirements: 'A stage and a projector', accessibility_needs: 'Needs a hearing loop',
+      // Free text naming no known layout, so its venue search spans every layout (SG2-48).
+      preferred_layout: 'Rows facing the stage'
     });
     const request = { event_id: 61, starts_at: '2030-06-17T02:00:00Z', ends_at: '2030-06-17T10:00:00Z', status: 'pending', notes: null };
     this.tables.venue_booking_requests.push({ ...request, request_id: 21, venue_id: 3 }, { ...request, request_id: 22, venue_id: 1 });
@@ -269,12 +273,13 @@ export class MemoryDatabase {
   }
 
   /** SG2-48: an approved event assigned to the coordinator, for 80 people
-   * needing a projector on 20 June 2030, when both venues are free. Regression
-   * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
+   * needing a projector in a theatre layout on 20 June 2030, when both venues
+   * are free. Regression Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
   seedVenueRequest() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 91, name: 'Venue Request Forum', status: 'approved', coordinator_id: 'user-coordinator',
-      proposed_date: '2030-06-20T02:00:00.000Z', expected_attendance: 80, venue_requirements: 'A projector'
+      proposed_date: '2030-06-20T02:00:00.000Z', expected_attendance: 80, venue_requirements: 'A projector',
+      preferred_layout: 'Theatre'
     });
     this.tables.venue_layouts.push(
       { venue_id: 1, layout: 'theatre', other_description: null },

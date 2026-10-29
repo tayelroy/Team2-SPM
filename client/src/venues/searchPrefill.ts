@@ -1,4 +1,5 @@
 import type { WorkItem } from '../api/workQueue';
+import { LAYOUT_LABELS, LAYOUTS, type Layout } from './layoutsApi';
 import { EMPTY_SEARCH, isoToSgtLocal, type VenueSearchValues } from './searchApi';
 
 /** Search criteria taken from an approved event (SG2-46 AC1). */
@@ -10,6 +11,17 @@ export interface VenueSearchPrefill {
   accessibilityNeeds: string | null;
   /** SG2-48 AC1: the venue requirements a venue request will carry. */
   venueRequirements: string | null;
+  /** SG2-48 AC1: the event's preferred layout when it names a known layout,
+   * so a request defaults to it even after the search filter is cleared. */
+  preferredLayout?: Layout | null;
+}
+
+/** The known layout an organiser's preferred layout names (value or label,
+ * any case, trimmed), or null for free text that names none. */
+export function layoutFromPreference(preference: unknown): Layout | null {
+  if (typeof preference !== 'string') return null;
+  const wanted = preference.trim().toLowerCase();
+  return LAYOUTS.find(layout => layout === wanted || LAYOUT_LABELS[layout].toLowerCase() === wanted) ?? null;
 }
 
 /** Mirror server/src/venues/suitability.ts: extract the same recognised
@@ -55,15 +67,18 @@ export function prefillFromEvent(item: WorkItem): VenueSearchPrefill {
     ? rawNeeds.trim() : null;
   const requirements = item.details.venue_requirements;
   const venueRequirements = typeof requirements === 'string' && requirements.trim() ? requirements.trim() : null;
+  const preferredLayout = layoutFromPreference(item.details.preferred_layout);
   return {
     eventId: item.event_id,
     eventName: item.title,
     accessibilityNeeds: needs,
     venueRequirements,
+    preferredLayout,
     values: {
       ...EMPTY_SEARCH,
       from: day === null ? '' : `${day}T00:00`,
       until: day === null ? '' : `${day}T23:59`,
+      layout: preferredLayout ?? '',
       attendance: typeof attendance === 'number' ? String(attendance) : '',
       facilities: venueRequirements === null ? '' : FACILITY_KEYWORDS
         .filter(([, pattern]) => pattern.test(venueRequirements)).map(([keyword]) => keyword).join(', '),

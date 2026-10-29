@@ -3194,10 +3194,10 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
-      "Clear the attendance and search again so both venues are listed.",
+      "Check Layout is pre-filled with Theatre from the event's preferred layout, then clear the attendance, set Layout to Any layout and search again so both venues are listed.",
       "Request Regression Hall, then Quiet Room, for 09:00\u201312:00 on 20 June 2030."
     ],
-    "data": "Event 91; Regression Hall (theatre) and Quiet Room (boardroom)",
+    "data": "Event 91 (preferred layout Theatre); Regression Hall (theatre) and Quiet Room (boardroom)",
     "expected": "Both requests are accepted and the event's venue requests list both venues as Pending, Quiet Room with its Boardroom layout.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",

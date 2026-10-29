@@ -191,7 +191,7 @@ const requested = { request_id: 41, event_id: 10, venue_id: 3, venue_name: 'Roof
   venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null };
 
 /** The venue search, suitability and venue request endpoints, as a coordinator sees them. */
-function stubEventSearch(booking = 'allowed') {
+function stubEventSearch(booking = 'allowed', venues: VenueMatch[] = [terrace]) {
   const made: unknown[] = [];
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
@@ -201,11 +201,37 @@ function stubEventSearch(booking = 'allowed') {
     }
     if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: made.length ? [requested] : [],
       arrangement: { state: made.length ? 'in_progress' : 'none', needed: made.length, approved: 0, pending: made.length, rejected: 0, unbooked: 0 } });
-    return Response.json({ venues: [terrace] });
+    return Response.json({ venues });
   });
   vi.stubGlobal('fetch', fetch);
   return made;
 }
+
+const hallA: VenueMatch = { ...terrace, venue_id: 7, name: 'Hall A', held: [],
+  layouts: [{ layout: 'classroom', other_description: null }, { layout: 'theatre', other_description: null }] };
+const theatreEvent: VenueSearchPrefill = { ...prefill, preferredLayout: 'theatre', values: { ...prefill.values, layout: 'theatre' } };
+
+test('[NORMAL] [SG2-48:AC1] an event preferring Theatre searches for theatre and its request defaults to theatre, even with the filter cleared', async () => {
+  const made = stubEventSearch('allowed', [hallA]);
+  render(<VenueSearch accessToken="token" prefill={theatreEvent} />);
+  expect(screen.getByLabelText('Layout')).toHaveValue('theatre');
+  expect(await screen.findByText('No venues have been requested for this event yet.')).toBeVisible();
+  fill({ Layout: '' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  expect(screen.getByLabelText('Required layout')).toHaveValue('theatre');
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Hall A' }));
+  await vi.waitFor(() => expect(made).toEqual([expect.objectContaining({ venue_id: 7, layout: 'theatre' })]));
+});
+
+test('[NORMAL] [SG2-48:AC1] the coordinator can still request another layout than the event prefers', async () => {
+  const made = stubEventSearch('allowed', [hallA]);
+  render(<VenueSearch accessToken="token" prefill={theatreEvent} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  fill({ 'Required layout': 'classroom' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Hall A' }));
+  await vi.waitFor(() => expect(made).toEqual([expect.objectContaining({ venue_id: 7, layout: 'classroom' })]));
+});
 
 test('[NORMAL] [SG2-48:AC1] [SG2-48:AC3] from an event\'s search a venue is requested for the searched period, and is then listed as pending', async () => {
   const made = stubEventSearch();

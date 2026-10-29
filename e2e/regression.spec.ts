@@ -1640,7 +1640,10 @@ test('SG2-48-P02 | [SG2-48:AC4] [NORMAL] one event requests several different ve
   expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
   await signIn(page, 'coordinator');
   await openVenueRequestSearch(page);
+  // The event's Theatre preference is pre-filled; widen to every layout.
+  await expect(page.getByLabel('Layout', { exact: true })).toHaveValue('theatre');
   await page.getByLabel('Attendance', { exact: true }).fill('');
+  await page.getByLabel('Layout', { exact: true }).selectOption('');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByText(/^2 venues available/)).toBeVisible();
   await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
@@ -2704,6 +2707,7 @@ async function decideVenue(page: Page, venue: string, reason?: string) {
 async function openAllVenues(page: Page, count: number) {
   await openVenueRequestSearch(page);
   await page.getByLabel('Attendance', { exact: true }).fill('');
+  await page.getByLabel('Layout', { exact: true }).selectOption('');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByText(new RegExp(`^${count} venues available`))).toBeVisible();
 }
