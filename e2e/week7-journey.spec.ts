@@ -72,12 +72,8 @@ test.beforeEach(async ({ request }) => {
   expect((await request.put('/api/venues/1/layouts', { headers, data: { layouts: [{ layout: 'theatre' }] } })).status()).toBe(200);
 });
 
-test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] [SG2-48:AC1] [SG2-53:AC1] [SG2-55:AC1] [SG2-49:AC1] [SG2-91:AC1] [SG2-92:AC3] [SG2-94:AC5] [SG2-58:AC1] [SG2-100:AC1] the Week 7 journey runs in the browser from submission to a confirmed event', async ({ page }, info) => {
-  test.setTimeout(180_000);
-  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-  await page.setViewportSize({ width: 1440, height: 1000 });
-
-  // 1. The organiser submits a complete request; it waits for the Lead.
+/** Step 1: the organiser submits a complete request asking for two microphones. */
+async function submitRequest(page: Page) {
   await signIn(page, 'organiser');
   await nav(page, 'New request');
   for (const [label, value] of Object.entries({ 'Event name': EVENT, Purpose: 'Week 7 release check',
@@ -93,19 +89,20 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await expect(page.getByRole('status').filter({ hasText: `${EVENT} has been submitted for review.` })).toBeVisible();
   await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   expect(await status(page)).toBe('unassigned');
-  await page.setViewportSize({ width: 390, height: 900 });
-  await evidence(page, info, 'week7-01-submitted-mobile-390', page.getByRole('main'), true);
-  await page.setViewportSize({ width: 1440, height: 1000 });
+}
 
-  // 2. The Lead assigns a coordinator from the queue.
+/** Step 2: the Lead assigns Regression coordinator from the queue. */
+async function assignCoordinator(page: Page) {
   await signIn(page, 'lead');
   await nav(page, 'Assign coordinators');
   await page.getByLabel(`Coordinator for ${EVENT}`, { exact: true }).selectOption({ label: 'Regression coordinator' });
   await page.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(page.getByText('Assigned to Regression coordinator.', { exact: true })).toBeVisible();
   expect(await status(page)).toBe('submitted');
+}
 
-  // 3. The coordinator opens it (under review) and approves it.
+/** Step 3: the coordinator opens it (under review) and approves it. */
+async function approveRequest(page: Page) {
   await signIn(page, 'coordinator');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: new RegExp(EVENT) }).click();
@@ -113,19 +110,10 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.getByText('approved', { exact: true })).toBeVisible();
   expect(await status(page)).toBe('approved');
-  await page.setViewportSize({ width: 390, height: 900 });
-  const changePanel = page.getByTestId('change-requests-panel');
-  await expect(changePanel).toBeVisible();
-  const detail = page.locator('.organisation-detail');
-  const [panelBox, detailBox] = await Promise.all([changePanel.boundingBox(), detail.boundingBox()]);
-  expect(panelBox).not.toBeNull();
-  expect(detailBox).not.toBeNull();
-  expect(panelBox!.x - detailBox!.x).toBeGreaterThanOrEqual(20);
-  expect(detailBox!.x + detailBox!.width - panelBox!.x - panelBox!.width).toBeGreaterThanOrEqual(20);
-  await evidence(page, info, 'week7-02-coordinator-change-panel-inset-mobile-390', detail, true);
-  await page.setViewportSize({ width: 1440, height: 1000 });
+}
 
-  // 4. The coordinator requests a venue for the event's two hours.
+/** Step 4: the signed-in coordinator requests Regression Hall for the event's two hours. */
+async function requestHall(page: Page) {
   await openAssigned(page);
   await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
   // The search starts with the whole day, when Regression Hall already hosts the seeded workshop; ask for the event's two hours.
@@ -140,8 +128,10 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await form.getByLabel('Request until (Singapore time)').fill('2030-06-15T19:00');
   await form.getByRole('button', { name: 'Send request', exact: true }).click();
   await expect(page.getByText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.', { exact: true })).toBeVisible();
+}
 
-  // 5. ...and the equipment it needs.
+/** Step 5: the signed-in coordinator records the two microphones. */
+async function addMicrophones(page: Page) {
   await openAssigned(page);
   await page.getByRole('button', { name: 'Add equipment requirement', exact: true }).click();
   await page.getByRole('combobox', { name: 'Equipment type', exact: true }).selectOption('1');
@@ -149,9 +139,10 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await page.getByRole('textbox', { name: 'Technical notes', exact: true }).fill('Two handheld microphones for the briefing.');
   await page.getByRole('button', { name: 'Save equipment requirement', exact: true }).click();
   await expect(page.getByText('Equipment requirement saved.', { exact: true })).toBeVisible();
-  expect(await status(page)).toBe('approved');
+}
 
-  // 6. Technical Support place the microphones and reserve them.
+/** Step 6: Technical Support place the microphones and reserve them. */
+async function supportReserves(page: Page) {
   await signIn(page, 'support');
   await page.getByRole('button', { name: new RegExp(`Wireless microphones.*${EVENT}`) }).click();
   await page.getByRole('button', { name: 'Update arrangement for Wireless microphones', exact: true }).click();
@@ -166,15 +157,59 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await reservations.getByLabel('Reserve until (Singapore time)', { exact: true }).fill('2030-06-15T19:00');
   await reservations.getByRole('button', { name: 'Reserve equipment', exact: true }).click();
   await expect(reservations.getByRole('status')).toHaveText('Equipment reserved for this event. The assigned Event Coordinator has been notified.');
-  // The venue is still pending, so the event is not ready for the safety check.
-  expect(await status(page)).toBe('approved');
+}
 
-  // 7. Venue Staff approve the venue; the event is now ready and moves to the safety check by itself.
+/** Step 7: Venue Staff approve the Regression Hall request. */
+async function venueApproves(page: Page) {
   await signIn(page, 'venue');
   await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: /Regression Hall/ }).click();
   const decision = page.getByRole('article', { name: 'Venue booking request' });
   await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
   await expect(decision.getByText('Approved. The venue is committed to this event and the coordinator has been notified.', { exact: true })).toBeVisible();
+}
+
+test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] [SG2-48:AC1] [SG2-53:AC1] [SG2-55:AC1] [SG2-49:AC1] [SG2-91:AC1] [SG2-92:AC3] [SG2-94:AC5] [SG2-58:AC1] [SG2-100:AC1] the Week 7 journey runs in the browser from submission to a confirmed event', async ({ page }, info) => {
+  test.setTimeout(180_000);
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // 1. The organiser submits a complete request; it waits for the Lead.
+  await submitRequest(page);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await evidence(page, info, 'week7-01-submitted-mobile-390', page.getByRole('main'), true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // 2. The Lead assigns a coordinator from the queue.
+  await assignCoordinator(page);
+
+  // 3. The coordinator opens it (under review) and approves it.
+  await approveRequest(page);
+  await page.setViewportSize({ width: 390, height: 900 });
+  const changePanel = page.getByTestId('change-requests-panel');
+  await expect(changePanel).toBeVisible();
+  const detail = page.locator('.organisation-detail');
+  const [panelBox, detailBox] = await Promise.all([changePanel.boundingBox(), detail.boundingBox()]);
+  expect(panelBox).not.toBeNull();
+  expect(detailBox).not.toBeNull();
+  expect(panelBox!.x - detailBox!.x).toBeGreaterThanOrEqual(20);
+  expect(detailBox!.x + detailBox!.width - panelBox!.x - panelBox!.width).toBeGreaterThanOrEqual(20);
+  await evidence(page, info, 'week7-02-coordinator-change-panel-inset-mobile-390', detail, true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // 4. The coordinator requests a venue for the event's two hours.
+  await requestHall(page);
+
+  // 5. ...and the equipment it needs.
+  await addMicrophones(page);
+  expect(await status(page)).toBe('approved');
+
+  // 6. Technical Support place the microphones and reserve them.
+  await supportReserves(page);
+  // The venue is still pending, so the event is not ready for the safety check.
+  expect(await status(page)).toBe('approved');
+
+  // 7. Venue Staff approve the venue; the event is now ready and moves to the safety check by itself.
+  await venueApproves(page);
   await expect.poll(() => status(page)).toBe('awaiting_safety_check');
 
   // CONFLICT: before the Safety Officer approves, the event cannot be confirmed.
@@ -316,5 +351,38 @@ test('SG2-96-E2E03 | [NORMAL] [SG2-65:AC1] [SG2-65:AC2] mobile evidence shows co
   await expect(panel.getByRole('article')).toHaveCount(0);
   await expect(panel).toContainText('No change requests are waiting for your decision.');
   await evidence(page, info, 'week7-12-change-accepted-mobile-390', panel);
+  expect(errors).toEqual([]);
+});
+
+test('SG2-57-N01 | [CONFLICT] [SG2-57:AC1] [SG2-57:AC2] [SG2-94:AC4] equipment the organiser asked for stays outstanding until requested, so approving the venue first does not hand the event to the safety check', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // The organiser asks for two wireless microphones; the venue is booked before anyone requests them.
+  await submitRequest(page);
+  await assignCoordinator(page);
+  await approveRequest(page);
+  await requestHall(page);
+  await venueApproves(page);
+  expect(await status(page)).toBe('approved');
+
+  // The coordinator sees the microphones outstanding, naming what the organiser asked for.
+  await signIn(page, 'coordinator');
+  await openAssigned(page);
+  await expect(page.getByTestId('arrangement-venue-state')).toHaveText('Ready');
+  await expect(page.getByTestId('arrangement-equipment-state')).toHaveText('Outstanding');
+  await expect(page.getByTestId('arrangement-equipment')).toContainText(
+    'The organiser asked for equipment (Two wireless microphones) but none has been requested yet.');
+
+  // Requesting, placing and reserving them completes the arrangements; only then does the event reach the safety check.
+  await addMicrophones(page);
+  expect(await status(page)).toBe('approved');
+  await supportReserves(page);
+  await expect.poll(() => status(page)).toBe('awaiting_safety_check');
+
+  const stored = await ledger(page);
+  expect(stored.audit.filter(row => row.field_name === 'status').map(row => row.new_value)).toEqual(
+    ['unassigned', 'submitted', 'under_review', 'approved', 'awaiting_safety_check']);
   expect(errors).toEqual([]);
 });

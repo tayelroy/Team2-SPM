@@ -129,6 +129,14 @@ function FormField({
 }
 
 /**
+ * The answer the "None" button writes. For equipment requirements the server
+ * reads exactly this word (trimmed, any case) as "no equipment needed"
+ * (SG2-57; NO_EQUIPMENT_ANSWER in server/src/events/arrangementReadiness.ts);
+ * any other answer leaves the event's equipment outstanding until requested.
+ */
+const NONE_ANSWER = 'None';
+
+/**
  * A mandatory multi-line answer that may be "None" but not blank (SG2-105):
  * accessibility needs and equipment requirements. The button beside it
  * fills in "None" so saying so is one click.
@@ -180,7 +188,7 @@ function NoneableTextField({
         }}
       />
       <div>
-        <Chip {...chipStyle(value.trim() === 'None')} onClick={() => onChange(fieldKey, 'None')}>
+        <Chip {...chipStyle(value.trim() === NONE_ANSWER)} onClick={() => onChange(fieldKey, NONE_ANSWER)}>
           {noneLabel}
         </Chip>
       </div>

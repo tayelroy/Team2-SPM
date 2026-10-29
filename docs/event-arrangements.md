@@ -29,15 +29,30 @@ follows:
   as a venue the event needs until it is withdrawn. An event may need several
   bookings (Week 7 change #3); all of them must be approved and booked (SG2-58
   review).
-- **Equipment** — `not_required` when the event has no live `equipment_requests`.
-  Otherwise ready only when **every** live request is both **reserved** (an
+- **Equipment** — with no live `equipment_requests`, it depends on what the
+  organiser asked for (SG2-57, hosted QA 29 Oct 2026). If the event's
+  `equipment_requirements` is not set (blank text is stored as null) or is the
+  request form's "No equipment needed" answer, `None` (trimmed, any case),
+  equipment is `not_required`. Any other
+  answer means the organiser asked for equipment, so it is **outstanding**
+  ("The organiser asked for equipment (…) but none has been requested yet.")
+  until the coordinator records a request. A coordinator who decides nothing
+  needs booking sets **Equipment requirements** to `None` in Edit Planning
+  Information, which is recorded in the history. With live requests, it is
+  ready only when **every** live request is both **reserved** (an
   SG2-55 `equipment_reservations` receipt with that `request_id`) and
   **placed** by Technical Support with **no remaining shortfall**
   (`placement_venue_id` set and `shortfall = 0`). This was tightened by SG2-58
   (product-owner decision): SG2-57 originally accepted placement alone, but
   AC1 asks whether requested equipment is *reserved*, and the confirmation
   gate must agree with this panel. A legacy reservation without a `request_id`
-  reserves no request.
+  reserves no request. The same rule is applied in SQL by
+  `public.event_equipment_needed()` inside `safety_check_arrangements_ready()`
+  (the hand-off to the safety check) and `confirm_event()`; editing
+  `equipment_requirements` re-evaluates the hand-off at once (migration
+  `202610290001_requested_equipment_outstanding.sql`). Existing events are not
+  backfilled: each picks up the rule on its next arrangement change or edit,
+  and `confirm_event()` applies it immediately.
 - **Registration** — `not_required` when `registration_needed` is not true.
   Otherwise ready (SG2-94 AC6): capacity and times are the Event Organiser's
   (SG2-63) and do not hold confirmation up; the detail names whichever are not

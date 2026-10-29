@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError, type Role } from '../../server/src/auth/policy';
 import { currentActingRole, orderRoles, selectActingRole } from '../../server/src/auth/actingRole';
 import { DRAFT_FIELDS, validateDraftInput } from '../../server/src/events/fields';
+import { SAFETY_REFRESH_EVENT_COLUMNS, refreshSafetyCheckStatus } from './safety-handoff';
 
 // Synthetic fixtures only. This adapter deliberately does not emulate Postgres
 // constraints or RLS: the independent database-policy CI job owns that evidence.
@@ -664,6 +665,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       const embed = this.embed(column);
       return embed?.[3].split('!').includes('inner') ? [embed] : [];
     });
+    const refreshed: unknown[] = [];
     let rows = table.filter(row => this.filters.every(filter => filter(row)) && inner.every(([, alias, target]) => {
       const related = this.relation(row, alias, target);
       return Array.isArray(related) ? related.length > 0 : related !== null;
@@ -688,7 +690,14 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         return row;
       });
     } else if (this.operation === 'update') {
-      rows.forEach(row => Object.assign(row, structuredClone(this.values as Row)));
+      rows.forEach(row => {
+        const before = structuredClone(row);
+        Object.assign(row, structuredClone(this.values as Row));
+        // public.safety_check_refresh on events fires after the statement, so
+        // the written row returned below still shows the status it was given.
+        if (this.table === 'events' && SAFETY_REFRESH_EVENT_COLUMNS.some(column =>
+          JSON.stringify(before[column] ?? null) !== JSON.stringify(row[column] ?? null))) refreshed.push(row.event_id);
+      });
     } else if (this.operation === 'delete') {
       this.database.tables[this.table] = table.filter(row => !rows.includes(row));
     }
@@ -702,6 +711,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     });
     if (this.window) rows = rows.slice(this.window[0], this.window[1] + 1);
     const projected = rows.map(row => this.project(row, this.columns));
+    for (const eventId of refreshed) refreshSafetyCheckStatus(this.database, eventId, null);
     if (this.single && projected.length > 1) throw new Error('Fixture query expected at most one row');
     return { data: this.single ? projected[0] ?? null : projected, error: null, status: 200 };
   }

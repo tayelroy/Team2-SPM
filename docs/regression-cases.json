@@ -9289,6 +9289,41 @@
     "review": null
   },
   {
+    "id": "SG2-57-N01",
+    "title": "Equipment the organiser asked for stays outstanding until requested, so approving the venue first does not hand the event to the safety check",
+    "type": "CONFLICT",
+    "story": "SG2-57",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-57:AC1",
+      "SG2-57:AC2",
+      "SG2-94:AC4"
+    ],
+    "purpose": "Hosted QA 29 Oct 2026 (event #48): an event whose organiser asked for wireless microphones reached the safety check as soon as its venue was approved, because no equipment request existed and equipment counted as not required. Verify the organiser's equipment answer keeps equipment outstanding until it is requested, reserved and placed.",
+    "preconditions": "Production React build and real Express handlers on loopback; in-memory fixture reset, the safety-check hand-off turned on (/__e2e/safety-handoff) and a theatre layout recorded for Regression Hall; one browser page at 1440x1000.",
+    "steps": [
+      "Organiser submits 'Week 7 journey' asking for 'Two wireless microphones'; Lead assigns Regression coordinator; coordinator approves it.",
+      "Coordinator requests Regression Hall for the event's two hours; Venue Staff approve it before any equipment is requested.",
+      "Coordinator opens the event and reads the arrangements panel.",
+      "Coordinator adds 2 wireless microphones; Technical Support place and reserve them."
+    ],
+    "data": "Event 'Week 7 journey' (40 people, theatre, equipment 'Two wireless microphones'); Regression Hall; Wireless microphones; fixture accounts organiser, lead, coordinator, support, venue.",
+    "expected": "After the venue approval the event stays approved; Venue is Ready and Equipment is Outstanding with 'The organiser asked for equipment (Two wireless microphones) but none has been requested yet.'; adding the request keeps it approved; once reserved and placed it moves to awaiting_safety_check by itself; status history unassigned, submitted, under_review, approved, awaiting_safety_check; no page errors.",
+    "evidence": "e2e/week7-journey.spec.ts; e2e/support/safety-handoff.ts; supabase/migrations/202610290001_requested_equipment_outstanding.sql",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally; the same case fails against main (event reached awaiting_safety_check after the venue approval).",
+    "execution_evidence": "29 Oct 2026; bugfix/SG2-57-requested-equipment-outstanding working tree on main 046a6e0; local production build, Playwright Chromium, e2e/week7-journey.spec.ts: 2 passed.",
+    "execution_date": "29 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "relatedCases": [
+      "SG2-96-E2E01"
+    ],
+    "review": null
+  },
+  {
     "id": "SG2-71-B01",
     "title": "Every role's pages fit a 320px phone without sideways scrolling",
     "type": "BOUNDARY",

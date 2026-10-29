@@ -200,6 +200,12 @@ begin
       coalesce(position('public.event_safety_approved' in definition) > 0, false) as passed
     from confirmation_definition
     union all
+    -- SG2-57: equipment the organiser asked for but never requested.
+    select 'confirm_event requested equipment' as name,
+      coalesce(position('public.event_equipment_needed' in definition) > 0
+        and to_regprocedure('public.event_equipment_needed(text)') is not null, false) as passed
+    from confirmation_definition
+    union all
     select 'events safety_approval_gate trigger' as name,
       exists (select 1 from pg_trigger t where t.tgrelid = to_regclass('public.events')
         and t.tgname = 'safety_approval_gate' and not t.tgisinternal and t.tgenabled <> 'D'

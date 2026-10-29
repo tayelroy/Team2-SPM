@@ -256,6 +256,44 @@ begin
  end if;
 end $$;
 
+-- SG2-57 (hosted QA, event #48): equipment the organiser asked for blocks
+-- confirmation until it has been requested and is in place. 'None' (the
+-- request form's "No equipment needed", any case or padding) asks for none.
+update public.events set equipment_requirements='Wireless microphones x 2' where event_id=95879;
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status) values (95879,95879,95860,2,'rejected');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if public.confirm_event(95879) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-57:unrequested-equipment-blocks-confirm] [SG2-57:AC1] [SG2-58:AC2] [FAILURE] Equipment the organiser asked for that was never requested (only a rejected request) must refuse confirmation';
+ end if;
+end $$;
+savepoint none_answer;
+reset role;
+update public.events set equipment_requirements=' NONE ' where event_id=95879;
+set local role authenticated;
+do $$
+begin
+ if public.confirm_event(95879)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-57:none-answer-confirms] [SG2-57:AC2] [SG2-58:AC2] [BOUNDARY] An event that answered None (trimmed, any case) and requested no equipment must confirm as before';
+ end if;
+end $$;
+rollback to savepoint none_answer;
+reset role;
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position)
+ values (95889,95879,95860,2,'approved',0,95860,'Stage left');
+insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at)
+ values (95879,95860,2,'2031-11-19T09:00Z','2031-11-19T17:00Z',95889,'2031-10-01T00:00Z');
+set local role authenticated;
+do $$
+begin
+ if public.confirm_event(95879)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-57:requested-equipment-in-place-confirms] [SG2-57:AC1] [SG2-58:AC1] [NORMAL] Once the asked-for equipment is requested, reserved and placed, the event must confirm';
+ end if;
+end $$;
+reset role;
+
 -- Decision 1: only Preparation can be confirmed. SG2-94 AC5: an event still
 -- on its way to the safety check is refused with the check outstanding, even
 -- with every arrangement in place and an earlier Approve on record; every

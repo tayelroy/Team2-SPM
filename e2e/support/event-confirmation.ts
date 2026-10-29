@@ -33,6 +33,7 @@ export function createMemoryConfirm(database: MemoryDatabase) {
       venue_requests: facts.facts.venue_requests,
       affected_bookings: facts.facts.affected_bookings,
       equipment_requests: facts.facts.equipment_requests,
+      equipment_requirements: (event.equipment_requirements ?? null) as string | null,
       arrangements_recheck_needed: (event.arrangements_recheck_needed ?? null) as boolean | null,
       outstanding_arrangements: (event.outstanding_arrangements ?? null) as string[] | null
     });

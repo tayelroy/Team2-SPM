@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeArrangementReadiness,
+  equipmentNeeded,
   isSafetyApproved,
   type ArrangementReadinessInput,
   type ArrangementKey,
@@ -21,6 +22,7 @@ function baseInput(overrides: Partial<ArrangementReadinessInput> = {}): Arrangem
     registration_closes_at: '2026-11-03T00:00:00.000Z',
     venue_requests: [{ status: 'approved', booked: true }],
     equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true }],
+    equipment_requirements: 'Wireless microphones x 2',
     ...overrides
   };
 }
@@ -103,7 +105,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
 
   test('[NORMAL] [SG2-57:AC2] equipment and registration are not required when none is needed', () => {
     const result = computeArrangementReadiness(
-      baseInput({ equipment_requests: [], registration_needed: false, registration_capacity: null })
+      baseInput({ equipment_requests: [], equipment_requirements: 'None', registration_needed: false, registration_capacity: null })
     );
 
     assert.equal(stateOf(result, 'equipment'), 'not_required');
@@ -291,6 +293,62 @@ describe('computeArrangementReadiness (SG2-57)', () => {
       detail: '2 equipment requests reserved and placed.'
     });
     assert.equal(result.ready_for_confirmation, true);
+  });
+
+  test('[FAILURE] [SG2-57:AC1] [SG2-58:AC2] equipment the organiser asked for but nobody requested is outstanding, quoting the request', () => {
+    // Hosted QA event #48: venues approved, equipment asked for, none requested.
+    const result = computeArrangementReadiness(baseInput({ equipment_requests: [], equipment_requirements: 'Wireless microphones x 2' }));
+
+    assert.deepEqual(result.arrangements.find(a => a.key === 'equipment'), {
+      key: 'equipment',
+      label: 'Equipment',
+      state: 'outstanding',
+      detail: 'The organiser asked for equipment (Wireless microphones x 2) but none has been requested yet.'
+    });
+    assert.deepEqual(result.outstanding, ['equipment']);
+    assert.equal(result.ready_for_confirmation, false);
+  });
+
+  test('[BOUNDARY] [SG2-57:AC1] only rejected or cancelled requests leave asked-for equipment outstanding', () => {
+    const result = computeArrangementReadiness(baseInput({
+      equipment_requests: [
+        { status: 'Rejected', shortfall: null, placement_venue_id: null, reserved: false },
+        { status: 'cancelled', shortfall: 0, placement_venue_id: 7, reserved: true }
+      ],
+      equipment_requirements: 'Projector'
+    }));
+
+    assert.equal(stateOf(result, 'equipment'), 'outstanding');
+    assert.match(result.arrangements.find(a => a.key === 'equipment')!.detail, /^The organiser asked for equipment \(Projector\) but none has been requested yet\.$/);
+  });
+
+  test('[BOUNDARY] [SG2-57:AC2] the "None" answer, in any case or padding, or no answer needs no equipment', () => {
+    for (const answer of ['None', ' NONE ', '\tnone\n', null]) {
+      const result = computeArrangementReadiness(baseInput({ equipment_requests: [], equipment_requirements: answer }));
+      assert.deepEqual(result.arrangements.find(a => a.key === 'equipment'),
+        { key: 'equipment', label: 'Equipment', state: 'not_required', detail: 'No equipment requested.' }, String(answer));
+      assert.equal(result.ready_for_confirmation, true, String(answer));
+    }
+  });
+
+  test('[BOUNDARY] [SG2-57:AC2] any other answer is a need: words containing "none", blank text and long text', () => {
+    for (const answer of ['None needed but a lectern', 'none.', '', '   ']) {
+      assert.equal(equipmentNeeded(answer), true, JSON.stringify(answer));
+    }
+    const long = `${'Stage lighting rig, '.repeat(10)}and a smoke machine`;
+    const detail = computeArrangementReadiness(baseInput({ equipment_requests: [], equipment_requirements: `  ${long}\n` }))
+      .arrangements.find(a => a.key === 'equipment')!.detail;
+    // The answer is quoted on one line and cut to 60 characters.
+    assert.equal(detail, `The organiser asked for equipment (${long.slice(0, 59)}…) but none has been requested yet.`);
+    // A blank answer still asks for something but has nothing to quote.
+    assert.equal(computeArrangementReadiness(baseInput({ equipment_requests: [], equipment_requirements: '   ' }))
+      .arrangements.find(a => a.key === 'equipment')!.detail, 'The organiser asked for equipment but none has been requested yet.');
+  });
+
+  test('[NORMAL] [SG2-57:AC1] once asked-for equipment is requested, reserved and placed it reads ready', () => {
+    const result = computeArrangementReadiness(baseInput({ equipment_requirements: 'Wireless microphones x 2' }));
+    assert.deepEqual(result.arrangements.find(a => a.key === 'equipment'),
+      { key: 'equipment', label: 'Equipment', state: 'ready', detail: '1 equipment request reserved and placed.' });
   });
 
   test('[NORMAL] [SG2-94:AC6] registration needed with a time unset does not hold confirmation up, and names the gap for the organiser', () => {

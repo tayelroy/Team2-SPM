@@ -21,7 +21,7 @@ import {
   type FetchEventArrangementFactsResult
 } from '../db/eventArrangements';
 import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
-import { computeArrangementReadiness } from './arrangementReadiness';
+import { isLive } from './arrangementReadiness';
 import { RETURNS_TO_PLANNING } from './changeImpact';
 import { isRegistrationSettingField } from './registrationSettings';
 import type { Principal } from '../auth/policy';
@@ -250,22 +250,20 @@ export function validatePlanningSchedule(
  * Detects which existing arrangements an edit affects (AC 2): a date shift or
  * attendance increase affects the venue booking and equipment requests.
  * Registration capacity is the organiser's (SG2-63). A category is only
- * flagged when the event actually has that arrangement, read through SG2-57's
- * readiness view: a live venue booking request (pending, held or approved), a
- * live equipment request or reservation, or registration being needed. An edit to an event
- * with nothing arranged yet has no impact and needs no confirmation.
+ * flagged when the event actually has that arrangement, by SG2-57's live
+ * request rule: a live venue booking request (pending, held or approved), a
+ * live equipment request or reservation, or registration being needed. An
+ * edit to an event with nothing arranged yet — including equipment the
+ * organiser asked for that nobody has requested — has no impact and needs no
+ * confirmation.
  */
 export function detectArrangementImpact(
   current: EventPlanningRecord,
   update: PlanningUpdateValues,
   facts: EventArrangementFacts
 ): ArrangementImpact {
-  // Only the venue and equipment items are read here, so the safety check's
-  // decision is not fetched.
-  const readiness = computeArrangementReadiness({ ...current, ...facts, latest_safety_decision: null });
-  const [, equipment] = readiness.arrangements;
-  const venueArranged = readiness.venue_requested;
-  const equipmentRequested = equipment.state !== 'not_required';
+  const venueArranged = facts.venue_requests.some(isLive);
+  const equipmentRequested = facts.equipment_requests.some(isLive);
   const equipmentArranged = equipmentRequested || facts.equipment_reserved === true;
 
   const affected = new Set<string>();

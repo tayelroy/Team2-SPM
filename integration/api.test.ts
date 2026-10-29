@@ -118,8 +118,11 @@ async function draft(body = values) {
   assert.equal(result.status, 201, JSON.stringify(result.body));
   return result.body.request.event_id as number;
 }
-async function planned() {
-  const id = await draft();
+// SG2-57: an event that asked for equipment waits in Planning until it is
+// requested, so journeys that book only a venue answer "None".
+const noEquipment = { ...values, equipment_requirements: 'None' };
+async function planned(body = values) {
+  const id = await draft(body);
   assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
   assert.equal((await api.patch(`/api/event-requests/${id}/coordinator`).set(auth('lead')).send({ coordinatorId: ids.coordinator })).status, 200);
   assert.equal((await api.patch(`/api/event-requests/${id}/review`).set(auth('coordinator')).send({})).status, 200);
@@ -314,8 +317,33 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] [SG2-
   assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
 });
 
-test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation events refuse direct detail edits, keep registration edits, and a later-stage impact returns to Planning with notices and history', async () => {
+test('[FAILURE] [NORMAL] [SG2-57:AC1] [SG2-57:AC2] [SG2-91:AC1] [SG2-58:AC2] equipment asked for but never requested holds a booked event in Planning until the coordinator answers None', async () => {
+  // Hosted QA event #48: the organiser asked for equipment, the venue was approved, nothing was requested.
   const id = await planned();
+  const venue = await database.from('venues').insert({ name: 'Integration equipment hall', capacity: 200 }).select('venue_id').single();
+  assert.equal(venue.error, null);
+  const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, status: 'confirmed' }).select('booking_id').single();
+  assert.equal(booking.error, null);
+  assert.equal((await database.from('venue_booking_requests').insert({ ...period, status: 'approved',
+    venue_booking_id: booking.data!.booking_id })).error, null);
+  assert.equal((await stored(id)).status, 'approved');
+  const waiting = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.equal(waiting.status, 200);
+  assert.deepEqual(waiting.body.outstanding, ['equipment', 'safety']);
+  assert.deepEqual(waiting.body.arrangements[1], { key: 'equipment', label: 'Equipment', state: 'outstanding',
+    detail: 'The organiser asked for equipment (1 projector) but none has been requested yet.' });
+  // Recording that no equipment is needed after all needs no recheck and hands the event over at once.
+  const answered = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ equipment_requirements: ' none ' });
+  assert.equal(answered.status, 200, JSON.stringify(answered.body));
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
+  const handed = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.deepEqual(handed.body.outstanding, ['safety']);
+  assert.equal(handed.body.arrangements[1].state, 'not_required');
+});
+
+test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation events refuse direct detail edits, keep registration edits, and a later-stage impact returns to Planning with notices and history', async () => {
+  const id = await planned(noEquipment);
   await setRegistration(id);
   // SG2-94: the event reaches Preparation on the Safety Officer's approval of its current check.
   assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
@@ -479,7 +507,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions on SG2-91\'s list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {
-  const [approved, rejected, changed] = [await planned(), await planned(), await planned()];
+  const [approved, rejected, changed] = [await planned(noEquipment), await planned(noEquipment), await planned(noEquipment)];
   for (const id of [approved, rejected, changed]) {
     assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
   }
@@ -561,7 +589,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-93:AC1] [SG2-93:AC2] [SG2-93:AC3] [SG2-93:AC4] [SG2-93:AC5] native Request Changes sends the named venue back to Venue Staff, and the event returns to the check once it is confirmed again and Other is done', async () => {
-  const id = await planned();
+  const id = await planned(noEquipment);
   const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
   assert.equal(venue.error, null);
   const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-07-10T01:00:00Z', ends_at: '2090-07-10T05:00:00Z' };
