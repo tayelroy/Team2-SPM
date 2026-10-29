@@ -71,4 +71,16 @@ describe('EventDetail change impact (SG2-66)', () => {
     expect(screen.queryByTestId('change-requests-panel')).not.toBeInTheDocument();
   });
 
+  test.each(['cancelled', 'rejected', 'completed'])(
+    '[BOUNDARY] [SG2-66:AC4] a %s event retains its final stage without active recheck prompts', async (status) => {
+      vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...detail, status, canManage: true, registrationNeeded: false } });
+      vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage: { ...stage, raw_status: status, stage: status, description: `Event ${status}.` } });
+      renderAs('Event Organiser');
+      expect(await screen.findByTestId('stage-badge')).toHaveTextContent(status);
+      expect(screen.queryByTestId('arrangements-recheck-banner')).not.toBeInTheDocument();
+      expect(screen.queryByText('Arrangements Recheck Needed')).not.toBeInTheDocument();
+      expect(screen.getByTestId('waiting-on-action')).toHaveTextContent(`Event ${status}.`);
+    },
+  );
+
 });

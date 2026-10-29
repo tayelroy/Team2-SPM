@@ -287,7 +287,7 @@ export default function EventDetail({
           {stage && (
             <div className="organisation-detail-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <EventStageTracker stage={stage} />
-              {stage.arrangements_recheck_needed && (
+              {stage.arrangements_recheck_needed && !['cancelled', 'rejected', 'completed'].includes(detail.status) && (
                 <Notice
                   data-testid="arrangements-recheck-banner"
                   style={{

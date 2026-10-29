@@ -60,7 +60,7 @@ export default function CancellationPanel({
   let body;
   if (status === 'cancelled') {
     // AC4/AC5: the cancellation is final and says why.
-    body = <p className="organisation-detail-description">
+    body = <p role="status" className="organisation-detail-description">
       {`This event was cancelled${cancelledAt ? ` on ${formatSgtTimestamp(cancelledAt)}` : ''}.`}
       {reason ? ` Reason: ${reason}` : ''} A similar event needs a new request.
     </p>;

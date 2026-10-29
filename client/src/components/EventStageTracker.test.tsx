@@ -137,6 +137,7 @@ describe('EventStageTracker (SG2-38)', () => {
     expect(screen.getByTestId('waiting-on-action')).toHaveTextContent(description);
     expect(screen.queryByText('None (Planning completed)')).not.toBeInTheDocument();
     expect(screen.queryByText('No further actions pending. All lifecycle requirements are satisfied.')).not.toBeInTheDocument();
+    if (raw_status !== 'on_hold') expect(screen.queryByText('Arrangements Recheck Needed')).not.toBeInTheDocument();
   });
 });
 

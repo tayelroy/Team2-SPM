@@ -315,7 +315,8 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
         <RegistrationPanel eventId={item.event_id} accessToken={accessToken} />
       )}
       {/* SG2-67 AC1: the organiser's request to cancel, which only the assigned
-          coordinator carries out; a cancelled event then leaves the queue. */}
+          coordinator carries out. Keep the final receipt until they go back:
+          re-reading an event removed from active work would turn success into a 404. */}
       {item.kind === 'event' && item.assigned_to_me && accessToken && (
         <CancellationPanel
           eventId={item.event_id}
@@ -325,7 +326,7 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
           requestedAt={typeof currentDetails.cancellation_requested_at === 'string' ? currentDetails.cancellation_requested_at : null}
           reason={typeof currentDetails.cancellation_reason === 'string' ? currentDetails.cancellation_reason : null}
           cancelledAt={null}
-          onChanged={onReload}
+          onChanged={() => setStatus('cancelled')}
         />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}

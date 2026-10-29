@@ -22,6 +22,12 @@ export const REGISTRATION_STATE: Record<RegistrationWindow, string> = {
   closed: 'Registration has closed.',
 };
 
+const TERMINAL_REGISTRATION_STATE: Record<string, string> = {
+  cancelled: 'This event was cancelled. Registration is closed.',
+  rejected: 'This event was rejected. Registration is unavailable.',
+  completed: 'This event is completed. Registration is closed.',
+};
+
 const MAX_CAPACITY = 2_147_483_647;
 /** SG2-62 AC6: the response window is whole hours, up to a week. */
 const MAX_RESPONSE_HOURS = 168;
@@ -81,7 +87,7 @@ function Picture({ view, eventId, accessToken, onChanged }: {
   const time = (iso: string | null) => (iso ? formatSgtTimestamp(iso) : 'Not set');
   return (
     <>
-      <p className="registration-state" data-window={view.window}>{REGISTRATION_STATE[view.window]}</p>
+      <p className="registration-state" data-window={view.window}>{TERMINAL_REGISTRATION_STATE[view.status] ?? REGISTRATION_STATE[view.window]}</p>
       <dl className="registration-facts">
         <div><dt>Registered</dt><dd data-testid="registration-count">{view.registered_count}</dd></div>
         <div><dt>Capacity</dt><dd>{view.registration_capacity ?? 'Not set'}</dd></div>

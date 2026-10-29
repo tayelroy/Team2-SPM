@@ -108,7 +108,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
           </p>
         </div>
 
-        {stage.arrangements_recheck_needed && (
+        {stage.arrangements_recheck_needed && !['cancelled', 'rejected', 'completed'].includes(stage.raw_status) && (
           <Badge bg="rgba(255, 180, 0, 0.16)" fg="#fde047" size={11}>
             Arrangements Recheck Needed
           </Badge>
