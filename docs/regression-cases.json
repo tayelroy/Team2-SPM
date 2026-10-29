@@ -106,7 +106,7 @@
       "Check the matching role banner and a named role-specific navigation action, page title and absence of page errors."
     ],
     "data": "organiser/coordinator/venue/support/attendee@example.test; password Regression123!",
-    "expected": "Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment requests or Event page), and produces no page error or Vite overlay.",
+    "expected": "Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment or Find events), and produces no page error or Vite overlay.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -3379,7 +3379,7 @@
     "expected": [
       "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks, Find an event] (SG2-70 added Find an event) and no prototype event",
       "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators, Coordinator overview, Find an event], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
-      "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
+      "Open unassigned queue lands on the Unassigned queue page; attendee Find events and My registrations remain absent from the Lead menu"
     ],
     "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
     "layer": "Playwright browser + fixture API",
@@ -10158,7 +10158,7 @@
     "execution_date": "28 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
-      "Sign in as attendee at 1440px; POST the waiting list twice through the API and read the ledger.",
+      "POST the waiting list twice through the authenticated API and read the ledger, then sign in as attendee at 1440px to load the current catalogue.",
       "Open Find events, read the badge, open Chamber Concert and press Leave the waiting list.",
       "Read the ledger; DELETE the waiting list through the API."
     ],
@@ -10166,5 +10166,47 @@
     "expected": "The first POST is 201, the second 409 already, and the ledger holds one entry. The card shows 'Waiting list #1'. After leaving, 'You have left the waiting list.' with Join the waiting list offered again; the entry is left with ended_at; the second DELETE is 404.",
     "evidence": "e2e/waiting-list.spec.ts; e2e/support/registrable-events.ts",
     "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "UI-RELEASE-01",
+    "title": "mobile and desktop landing footer remain reachable through native scrolling",
+    "type": "Positive",
+    "story": "SG2-22",
+    "mapped_acs": ["SG2-22:AC3"],
+    "steps": ["Open the landing at 390 and 1440 pixels", "Scroll to the copyright and capture the visible footer"],
+    "expected": "Native scrolling reaches the complete footer with no horizontal page overflow or console errors.",
+    "evidence": "e2e/ui-release-layout.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "execution_date": "29 Oct 2026",
+    "actual": "Passed in the complete 192-case local browser run; screenshots attached directly to the PR draft."
+  },
+  {
+    "id": "UI-RELEASE-02",
+    "title": "authenticated phone headers remain compact and navigation remains operable",
+    "type": "Positive",
+    "story": "SG2-22",
+    "mapped_acs": ["SG2-22:AC3"],
+    "steps": ["Sign in as attendee at 390 pixels", "Verify real attendee destinations and a header no taller than 160 pixels", "Sign in as coordinator and scroll and select the final navigation item", "Check the desktop header"],
+    "expected": "Header controls stay inside the viewport, navigation operates in its own scroll region, and the document has no horizontal overflow.",
+    "evidence": "e2e/ui-release-layout.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "execution_date": "29 Oct 2026",
+    "actual": "Passed in the complete 192-case local browser run; screenshots attached directly to the PR draft."
+  },
+  {
+    "id": "UI-RELEASE-03",
+    "title": "venue editing and organiser request forms remain readable on phone and desktop",
+    "type": "Positive",
+    "story": "SG2-22",
+    "mapped_acs": ["SG2-22:AC3"],
+    "steps": ["Open venue edit at 1440 and 390 pixels", "Select Other and enter its description", "Check compact checkbox bounds and field widths", "Open organiser New request and check guidance and actions"],
+    "expected": "Fields and checkbox controls remain inside the viewport, the incomplete request cannot submit, and neither form causes document overflow.",
+    "evidence": "e2e/ui-release-layout.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "execution_date": "29 Oct 2026",
+    "actual": "Passed in the complete 192-case local browser run; screenshots attached directly to the PR draft."
   }
 ]
