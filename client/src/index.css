@@ -4,11 +4,9 @@
  * controls, responsive layouts, the reset, fonts, keyframes and interaction states.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap');
-
 :root {
-  /* DM Sans stands in for Matter, the mockup's display face. */
-  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Keep text immediately readable without an external font download. */
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -151,6 +149,7 @@ a:hover {
 .work-queue-open { display: flex; justify-content: space-between; color: #cbfffc; margin-top: 4px; }
 .work-queue-empty { color: #bbc7c6; line-height: 1.6; }
 @media (max-width: 600px) {
+  .request-fields { grid-template-columns: minmax(0, 1fr) !important; }
   .work-queue-heading { flex-wrap: wrap; }
   .work-queue-group { padding: 18px; }
   .work-queue-item { padding: 18px; }
@@ -243,6 +242,9 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
   .organisation-detail-panel { margin: 20px; }
   /* The header scrolls away on a phone instead of covering a fifth of the screen. */
   .app-header { position: relative !important; }
+  .app-header > div { gap: 12px !important; padding: 12px 20px !important; }
+  .app-navigation { order: 3; margin-left: 0 !important; flex-basis: 100% !important; flex-wrap: nowrap !important; gap: 20px !important; overflow-x: auto; scrollbar-width: thin; }
+  .app-navigation > button { flex-shrink: 0; min-height: 44px; }
   .app-nav-item { padding: 8px 0 6px !important; }
   .app-header-controls { width: 100%; }
   .app-header-controls > .app-role-switcher { position: static; flex: 1; max-width: none; }

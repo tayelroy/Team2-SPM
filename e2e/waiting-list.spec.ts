@@ -93,7 +93,6 @@ test('SG2-61-P01 | [NORMAL] [SG2-61:AC1] [SG2-61:AC4] [SG2-61:AC5] [SG2-61:AC7] 
 
 test('SG2-61-N01 | [CONFLICT] [SG2-61:AC6] an attendee cannot join the waiting list twice, can leave it at any time, and leaving again is refused', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signIn(page, 'attendee');
   const response = await page.request.post('/api/auth/login', { data: { email: 'attendee@example.test', password: 'Regression123!' } });
   const headers = { Authorization: `Bearer ${(await response.json()).accessToken}` };
 
@@ -104,6 +103,8 @@ test('SG2-61-N01 | [CONFLICT] [SG2-61:AC6] an attendee cannot join the waiting l
   expect((await ledger(page)).entries).toHaveLength(1);
 
   // Leaving from the event's details; afterwards the list can be joined again.
+  // Seed the API state before mounting the attendee's authenticated catalogue.
+  await signIn(page, 'attendee');
   const card = await openConcert(page);
   await atBothWidths(page, () => card.getByText('Waiting list #1', { exact: true }));
   await card.getByRole('button', { name: 'View details', exact: true }).click();

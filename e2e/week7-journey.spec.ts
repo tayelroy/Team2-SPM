@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 
 // SG2-96: the whole Week 7 journey in the browser, one person at a time:
 // the organiser submits, the Lead assigns, the coordinator approves and
@@ -19,7 +20,33 @@ async function signIn(page: Page, account: string) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('banner')).toBeVisible();
 }
-const nav = (page: Page, name: string) => page.getByRole('navigation').getByRole('button', { name, exact: true }).click();
+async function auth(page: Page, account: string) {
+  const response = await page.request.post('/api/auth/login', {
+    data: { email: `${account}@example.test`, password: 'Regression123!' },
+  });
+  expect(response.status()).toBe(200);
+  return { Authorization: `Bearer ${(await response.json()).accessToken}` };
+}
+async function evidence(
+  page: Page,
+  info: TestInfo,
+  name: string,
+  target: Locator = page.getByRole('main'),
+  persist = false,
+) {
+  await target.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await target.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const path = persist ? `test-results/release-evidence/${name}.png` : undefined;
+  if (path) await mkdir('test-results/release-evidence', { recursive: true });
+  const body = await target.screenshot(path ? { path } : undefined);
+  await info.attach(name, { body, contentType: 'image/png' });
+}
+async function nav(page: Page, name: string) {
+  const target = page.getByRole('navigation').getByRole('button', { name, exact: true });
+  await target.scrollIntoViewIfNeeded();
+  await target.click();
+}
 async function ledger(page: Page) {
   return (await page.request.get(`/__e2e/journey-ledger?name=${encodeURIComponent(EVENT)}`)).json() as Promise<{
     events: { event_id: number; status: string; safety_check_revision?: number }[]; audit: { field_name: string; new_value: string }[];
@@ -45,7 +72,7 @@ test.beforeEach(async ({ request }) => {
   expect((await request.put('/api/venues/1/layouts', { headers, data: { layouts: [{ layout: 'theatre' }] } })).status()).toBe(200);
 });
 
-test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] [SG2-48:AC1] [SG2-53:AC1] [SG2-55:AC1] [SG2-49:AC1] [SG2-91:AC1] [SG2-92:AC3] [SG2-94:AC5] [SG2-58:AC1] [SG2-100:AC1] the Week 7 journey runs in the browser from submission to a confirmed event', async ({ page }) => {
+test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] [SG2-48:AC1] [SG2-53:AC1] [SG2-55:AC1] [SG2-49:AC1] [SG2-91:AC1] [SG2-92:AC3] [SG2-94:AC5] [SG2-58:AC1] [SG2-100:AC1] the Week 7 journey runs in the browser from submission to a confirmed event', async ({ page }, info) => {
   test.setTimeout(180_000);
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -66,6 +93,9 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await expect(page.getByRole('status').filter({ hasText: `${EVENT} has been submitted for review.` })).toBeVisible();
   await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   expect(await status(page)).toBe('unassigned');
+  await page.setViewportSize({ width: 390, height: 900 });
+  await evidence(page, info, 'week7-01-submitted-mobile-390', page.getByRole('main'), true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   // 2. The Lead assigns a coordinator from the queue.
   await signIn(page, 'lead');
@@ -83,6 +113,17 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.getByText('approved', { exact: true })).toBeVisible();
   expect(await status(page)).toBe('approved');
+  await page.setViewportSize({ width: 390, height: 900 });
+  const changePanel = page.getByTestId('change-requests-panel');
+  await expect(changePanel).toBeVisible();
+  const detail = page.locator('.organisation-detail');
+  const [panelBox, detailBox] = await Promise.all([changePanel.boundingBox(), detail.boundingBox()]);
+  expect(panelBox).not.toBeNull();
+  expect(detailBox).not.toBeNull();
+  expect(panelBox!.x - detailBox!.x).toBeGreaterThanOrEqual(20);
+  expect(detailBox!.x + detailBox!.width - panelBox!.x - panelBox!.width).toBeGreaterThanOrEqual(20);
+  await evidence(page, info, 'week7-02-coordinator-change-panel-inset-mobile-390', detail, true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   // 4. The coordinator requests a venue for the event's two hours.
   await openAssigned(page);
@@ -153,6 +194,7 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   await review.getByRole('button', { name: 'Record decision', exact: true }).click();
   await expect(page.getByText(`Approved for ${EVENT}. The organiser and the coordinator have been notified.`, { exact: true })).toBeVisible();
   expect(await status(page)).toBe('preparation');
+  await evidence(page, info, 'week7-03-safety-approved', page.getByRole('main'), true);
 
   // 9. The coordinator confirms the event.
   await signIn(page, 'coordinator');
@@ -169,6 +211,7 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   const confirmed = page.getByRole('region', { name: 'Confirmed arrangements', exact: true });
   await expect(confirmed).toContainText('Regression Hall');
   await expect(confirmed).toContainText('Wireless microphones');
+  await evidence(page, info, 'week7-04-confirmed-arrangements', confirmed, true);
 
   const stored = await ledger(page);
   expect(stored.events[0].status).toBe('confirmed');
@@ -178,4 +221,96 @@ test('SG2-96-E2E01 | [NORMAL] [CONFLICT] [SG2-30:AC1] [SG2-88:AC1] [SG2-37:AC1] 
   expect(stored.notifications.filter(row => row.recipient_id === 'user-organiser').map(row => row.kind)).toEqual(
     expect.arrayContaining(['coordinator_assigned', 'event_approved', 'safety_decision', 'event_confirmed']));
   expect(errors).toEqual([]);
+});
+
+test('SG2-96-E2E02 | [NORMAL] [SG2-60:AC1] [SG2-62:AC2] mobile evidence shows attendee registration and withdrawal', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.setViewportSize({ width: 390, height: 900 });
+
+  expect((await page.request.post('/__e2e/reset')).status()).toBe(204);
+  expect((await page.request.post('/__e2e/event-registration')).status()).toBe(204);
+  await signIn(page, 'attendee');
+  await nav(page, 'Find events');
+  await page.getByRole('region', { name: 'Events open for registration', exact: true })
+    .getByRole('article', { name: 'Harbour Lecture', exact: true })
+    .getByRole('button', { name: 'View details', exact: true }).click();
+  const registration = page.getByRole('region', { name: 'Registration', exact: true });
+  await registration.getByLabel('Accessibility or dietary needs (optional)', { exact: true }).fill('Step-free access');
+  await evidence(page, info, 'week7-05-attendee-registration-form-mobile-390', registration);
+  await registration.getByRole('button', { name: 'Register', exact: true }).click();
+  await expect(registration.getByRole('status')).toContainText('You are registered. Your place is held.');
+  await evidence(page, info, 'week7-06-attendee-registration-confirmed-mobile-390', registration, true);
+
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  expect((await page.request.post('/__e2e/reset')).status()).toBe(204);
+  expect((await page.request.post('/__e2e/my-registrations')).status()).toBe(204);
+  await signIn(page, 'attendee');
+  await nav(page, 'My registrations');
+  const list = page.getByRole('region', { name: 'Registrations', exact: true });
+  const lantern = list.getByRole('article', { name: 'Lantern Talk', exact: true });
+  await lantern.getByRole('button', { name: 'Withdraw', exact: true }).click();
+  const confirm = page.getByRole('group', { name: 'Withdraw from Lantern Talk', exact: true });
+  await evidence(page, info, 'week7-07-attendee-withdraw-confirmation-mobile-390', lantern, true);
+  await confirm.getByRole('button', { name: 'Confirm withdrawal', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'You have withdrawn from' }))
+    .toContainText('You have withdrawn from Lantern Talk. Your place has been given back.');
+  await evidence(page, info, 'week7-08-attendee-withdrawn-mobile-390', lantern);
+  expect(errors).toEqual([]);
+});
+
+test('SG2-96-E2E03 | [NORMAL] [SG2-65:AC1] [SG2-65:AC2] mobile evidence shows coordinator refusal and acceptance', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 900 });
+  const seedDecision = async () => {
+    expect((await page.request.post('/__e2e/reset')).status()).toBe(204);
+    expect((await page.request.post('/__e2e/under-review')).status()).toBe(204);
+    const response = await page.request.post('/api/event-requests/52/change-requests', {
+      headers: await auth(page, 'organiser'),
+      data: { field: 'expected_attendance', to: 34, reason: 'Two partner teams have joined.' },
+    });
+    expect(response.status()).toBe(201);
+  };
+  const openDecision = async () => {
+    await signIn(page, 'coordinator');
+    await page.getByRole('button', { name: /Decision Forum/ }).first().click();
+    return page.getByTestId('change-requests-panel');
+  };
+
+  await seedDecision();
+  let panel = await openDecision();
+  let card = panel.getByRole('article');
+  await card.getByRole('button', { name: 'Refuse change', exact: true }).click();
+  await card.getByLabel('Reason for refusing').fill('The Kelp Room cannot seat more.');
+  await evidence(page, info, 'week7-09-change-refusal-mobile-390', panel, true);
+  await card.getByRole('button', { name: 'Confirm refusal', exact: true }).click();
+  await expect(panel.getByRole('status')).toHaveText('Change refused. The event is unchanged and the organiser has been told why.');
+  await evidence(page, info, 'week7-10-change-refused-mobile-390', panel);
+
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  expect((await page.request.post('/__e2e/reset')).status()).toBe(204);
+  expect((await page.request.post('/__e2e/under-review')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(page.getByText('approved', { exact: true })).toBeVisible();
+  const raised = await page.request.post('/api/event-requests/52/change-requests', {
+    headers: await auth(page, 'organiser'),
+    data: { field: 'expected_attendance', to: 34, reason: 'Two partner teams have joined.' },
+  });
+  expect(raised.status()).toBe(201);
+  panel = await openDecision();
+  card = panel.getByRole('article');
+  await evidence(page, info, 'week7-11-change-acceptance-mobile-390', panel, true);
+  await card.getByRole('button', { name: 'Accept change', exact: true }).click();
+  await expect(panel.getByRole('article')).toHaveCount(0);
+  await expect(panel).toContainText('No change requests are waiting for your decision.');
+  await evidence(page, info, 'week7-12-change-accepted-mobile-390', panel);
 });

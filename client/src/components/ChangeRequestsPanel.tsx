@@ -134,6 +134,7 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
 
   return (
     <section
+      className="organisation-detail-panel"
       data-testid="change-requests-panel"
       aria-label="Change requests"
       style={{ display: 'grid', gap: '16px', minWidth: 0, overflowWrap: 'anywhere' }}

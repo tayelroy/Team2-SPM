@@ -169,12 +169,12 @@ test('[FAILURE] [SG2-23:AC2] invalid credentials show a generic error and keep y
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-23:AC1] an attendee lands on the event page rather than a dashboard', async () => {
+test('[NORMAL] [SG2-23:AC1] [SG2-59:AC1] an attendee lands on the authenticated event catalogue', async () => {
   await signInAs('Attendee');
-  expect(screen.getByRole('heading', { name: 'Event page' })).toBeInTheDocument();
-  expect(
-    screen.getByRole('heading', { name: 'Northbridge Investor Forum' }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
+  expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
+  expect(screen.queryByText('J. Halloran')).not.toBeInTheDocument();
+  expect(screen.queryByText('Northbridge Investor Forum')).not.toBeInTheDocument();
 });
 
 describe('every role can reach every screen in its navigation', () => {
@@ -205,8 +205,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
-    // SG2-62: the real list of registrations replaced the prototype dashboard's name.
-    Attendee: [['Dashboard', 'Attendee home'], ['Find events', 'Find events'], ['My registrations', 'My registrations'], ['Event page', 'Event page']],
+    Attendee: [['Find events', 'Find events'], ['My registrations', 'My registrations']],
     // SG2-86: only the screens these roles can use; neither holds
     // event_request.view, so neither is offered All events.
     // SG2-97: assignment moved here from Technical Support Staff.
@@ -383,7 +382,7 @@ test.each([500, 503, 'offline'] as const)('[FAILURE] [SG2-23:session-resume] a %
 
 test.each([
   ['Venue Staff', 'Catalogue', 'Venue desk'],
-  ['Attendee', 'Find events', 'Event page'],
+  ['Attendee', 'My registrations', 'Find events'],
 ] as const)('[NORMAL] [SG2-23:session-resume] the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
   await signInAs(role);
   fireEvent.click(within(header()).getByRole('button', { name: destination }));
@@ -874,12 +873,11 @@ test('[NORMAL] [SG2-44:AC1] the calendar shows the month grid with real venue av
   expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-59:AC1] an attendee reaches the events open for registration from the menu and from Browse events', async () => {
+test('[NORMAL] [SG2-59:AC1] the attendee catalogue is home and remains reachable from the menu', async () => {
   await signInAs('Attendee');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
   expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
-  fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Browse events' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
   expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
 });
 
@@ -902,22 +900,13 @@ test('[FAILURE] [SG2-59:AC1] an attendee without the grant is not offered Find e
   expect(within(await loadedNav()).queryByRole('button', { name: 'Find events' })).toBeNull();
 });
 
-test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-register', async () => {
+test('[FAILURE] [SG2-59:AC1] attendee navigation exposes no obsolete prototype event or dashboard', async () => {
   await signInAs('Attendee');
-  expect(
-    screen.getByText("You're registered — confirmation sent to your email."),
-  ).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Withdraw registration' }));
-  expect(
-    screen.getByText('Places are held as soon as you register.'),
-  ).toBeInTheDocument();
-  expect(screen.getByText('Not registered')).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Register' }));
-  expect(
-    screen.getByText("You're registered — confirmation sent to your email."),
-  ).toBeInTheDocument();
+  const labels = within(await loadedNav()).getAllByRole('button').map(button => button.textContent);
+  expect(labels).toEqual(['Find events', 'My registrations']);
+  expect(labels).not.toContain('Dashboard');
+  expect(labels).not.toContain('Event page');
+  expect(screen.queryByText('Northbridge Investor Forum')).not.toBeInTheDocument();
 });
 
 
@@ -1081,7 +1070,9 @@ test('[NORMAL] [SG2-102:AC2] [SG2-102:AC4] an attendee opens an event change not
   fireEvent.click(await screen.findByRole('button', { name: /^Notifications \(/ }));
   expect(await screen.findByText('Event changed')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: `Unread: ${message}` }));
-  expect(await screen.findByRole('heading', { name: 'Harbour Lecture' })).toBeVisible();
+  // The catalogue the attendee came from also has an event-card heading with
+  // this name; the notification summary is the level-two heading.
+  expect(await screen.findByRole('heading', { level: 2, name: 'Harbour Lecture' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'View event details' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View my registrations' }));
   const registrations = await screen.findByRole('region', { name: 'My registrations' });

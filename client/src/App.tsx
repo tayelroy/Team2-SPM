@@ -5,7 +5,6 @@ import type { StoredSession } from './auth/session';
 import { loadAccess, type Access } from './auth/access';
 import type { EventRequestDraft } from './api/eventRequests';
 import AppShell from './screens/AppShell';
-import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
@@ -35,7 +34,9 @@ import { GhostButton } from './ui';
 
 /** The screen a signed-in user of a given role opens on. */
 function landingScreenFor(role: Role): Screen {
-  return role === 'Attendee' ? 'attendee' : 'dashboard';
+  // Attendees start on the authenticated event catalogue. The old `attendee`
+  // screen was a static prototype with invented registrations and no API data.
+  return role === 'Attendee' ? 'findEvents' : 'dashboard';
 }
 
 /**
@@ -286,7 +287,9 @@ export default function App() {
     holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
     capacityExceptions: <CapacityExceptions key={session!.accessToken} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
-    attendee: <AttendeeEvent />,
+    // Compatibility for an in-memory screen value retained by older code:
+    // render the authenticated catalogue, never the removed static prototype.
+    attendee: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />,
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,

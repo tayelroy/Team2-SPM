@@ -1,29 +1,26 @@
-import { useInertiaScroll } from '../hooks/useInertiaScroll';
 import { useParticleOrb } from '../hooks/useParticleOrb';
 import { color, layout } from '../theme';
 import { GradientButton, Mark } from '../ui';
 
 /**
  * Marketing entry point: a full-height hero built around the particle orb,
- * over a deep-pool footer. Scrolling is eased by `useInertiaScroll`, so the
- * page is a fixed-height clip with a translated track rather than a normal
- * document scroll.
+ * over a deep-pool footer. Native scrolling keeps the complete footer
+ * reachable with touch, a keyboard, and changing mobile browser chrome.
  */
 export default function Landing({ onOpenApp }: { onOpenApp: () => void }) {
   const { canvasRef, spacerRef } = useParticleOrb();
-  const containerRef = useInertiaScroll();
 
   return (
     <div
-      ref={containerRef}
       style={{
-        height: '100vh',
-        overflow: 'hidden',
+        height: '100dvh',
+        overflowX: 'hidden',
+        overflowY: 'auto',
         position: 'relative',
         background: color.abyss,
       }}
     >
-      <div style={{ willChange: 'transform' }}>
+      <div>
         <main
           style={{
             minHeight: '100vh',

@@ -413,13 +413,13 @@ export default function RequestForm({
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))',
+        display: 'flex',
+        flexDirection: 'column',
         gap: '20px',
-        alignItems: 'start',
+        alignItems: 'stretch',
       }}
     >
-      <Card className="request-form-card" style={{ gap: '28px', gridColumn: 'span 2', minWidth: 0 }}>
+      <Card className="request-form-card" style={{ gap: '28px', minWidth: 0 }}>
         {/* Server-error alert banner (AC2) */}
         {submitStatus === 'error' && errorMessage && (
           <Notice
@@ -473,9 +473,10 @@ export default function RequestForm({
 
         {/* Mandatory fields grid (AC2) */}
         <div
+          className="request-fields"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
+            gridTemplateColumns: 'repeat(2,minmax(0,1fr))',
             gap: '20px',
             // Line inputs up across a row even when only some fields carry a hint line.
             alignItems: 'end',
@@ -712,8 +713,9 @@ export default function RequestForm({
         </div>
       </Card>
 
-      <RecessedCard style={{ gap: '16px' }}>
+      <RecessedCard style={{ gap: '16px', order: -1 }}>
         <Eyebrow>What happens next</Eyebrow>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '16px' }}>
         {NEXT_STEPS.map((step) => (
           <div key={step.n} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
             <span
@@ -731,6 +733,7 @@ export default function RequestForm({
             </span>
           </div>
         ))}
+        </div>
       </RecessedCard>
     </div>
   );

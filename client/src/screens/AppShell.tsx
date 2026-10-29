@@ -172,7 +172,7 @@ export default function AppShell({
         >
           <button
             type="button"
-            onClick={() => onNavigate(role === 'Attendee' ? 'attendee' : 'dashboard')}
+            onClick={() => onNavigate(role === 'Attendee' ? 'findEvents' : 'dashboard')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -198,6 +198,8 @@ export default function AppShell({
           </button>
 
           <nav
+            id="application-navigation"
+            className="app-navigation"
             aria-busy={access === undefined}
             style={{
               display: 'flex',

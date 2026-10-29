@@ -290,8 +290,8 @@ test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Event
     expect(api.loadReminderPreferences).toHaveBeenCalledTimes(role === 'Event Coordinator' ? 1 : 0);
   });
 
-test('[BOUNDARY] [SG2-69:AC1] tokenless attendee prototype retains empty preview drawer', () => {
-  render(<AppShell role="Attendee" screen="attendee" onNavigate={vi.fn()} onSignOut={vi.fn()}>Prototype</AppShell>);
+test('[BOUNDARY] [SG2-69:AC1] a tokenless attendee shell retains the empty preview drawer', () => {
+  render(<AppShell role="Attendee" screen="findEvents" onNavigate={vi.fn()} onSignOut={vi.fn()}>Catalogue</AppShell>);
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' })); expect(screen.getByText('No notifications available.')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Close notifications' })); expect(screen.queryByText('No notifications available.')).not.toBeInTheDocument();
 });

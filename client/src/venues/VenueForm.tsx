@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Card, Eyebrow, GhostButton, RecessedCard } from '../ui';
+import { Card, Eyebrow, GhostButton } from '../ui';
 import { color, gradient, label, radius, rule, surface } from '../theme';
 import type { Venue, VenueValues } from './api';
 import { LAYOUT_LABELS, LAYOUTS } from './layoutsApi';
@@ -90,19 +90,22 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
   }
 
   return (
-    <div className="venue-editor">
+    <div className="venue-editor" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
       <Card padding="clamp(20px, 4vw, 36px)" style={{ gap: '24px', minWidth: 0 }}>
         <div>
           <Eyebrow>Venue records</Eyebrow>
           <h2 style={{ fontSize: '28px', fontWeight: 500, letterSpacing: '-0.03em', margin: '10px 0 0' }}>
             {venue ? 'Edit venue' : 'Add venue'}
           </h2>
+          <p style={{ margin: '10px 0 0', color: color.silver, fontSize: '14px', lineHeight: 1.6 }}>
+            Saved details appear in the venue catalogue and search. Include access instructions and operating hours so coordinators can plan with confidence.
+          </p>
         </div>
         <form onSubmit={submit} aria-label={venue ? 'Edit venue' : 'Add venue'}>
           <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="venue-fields">
               {FIELDS.map(([key, title, placeholder]) => (
-                <div key={key} className={key === 'operating_information' ? 'venue-field-wide' : undefined}
+                <div key={key}
                   style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                   <label htmlFor={`venue-${key}`} style={label}>{title}</label>
                   {key === 'operating_information' ? (
@@ -130,10 +133,11 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
                     Select every layout this venue supports. A venue that does not support a required layout will not be offered as a match when one is requested.
                   </p>
                 </div>
-                {LAYOUTS.map(layout => (
-                  <div key={layout} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px 20px' }}>
+                  {LAYOUTS.map(layout => (
+                  <div key={layout} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: color.mist, fontSize: '14px' }}>
-                      <input type="checkbox" checked={selectedLayouts.has(layout)} onChange={() => toggleLayout(layout)} />
+                      <input type="checkbox" style={{ width: '18px', height: '18px', flex: 'none', margin: 0 }} checked={selectedLayouts.has(layout)} onChange={() => toggleLayout(layout)} />
                       {LAYOUT_LABELS[layout]}
                     </label>
                     {layout === 'other' && selectedLayouts.has('other') ? (
@@ -148,7 +152,8 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
                       />
                     ) : null}
                   </div>
-                ))}
+                  ))}
+                </div>
                 {layoutsInvalid ? <p role="alert">Describe the "Other" layout in 255 characters or fewer.</p> : null}
               </div>
             ) : null}
@@ -193,12 +198,6 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
           </fieldset>
         </form>
       </Card>
-      <RecessedCard padding="28px" style={{ gap: '14px', alignSelf: 'start' }}>
-        <Eyebrow>Keep planning information current</Eyebrow>
-        <p style={{ margin: 0, color: color.silver, fontSize: '14px', lineHeight: 1.6 }}>
-          Saved details appear in the venue catalogue and search. Include access instructions and operating hours so coordinators can plan with confidence.
-        </p>
-      </RecessedCard>
     </div>
   );
 }

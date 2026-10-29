@@ -90,13 +90,25 @@ describe('navFor / primaryActionFor (SG2-86)', () => {
     expect(navFor('Event Coordinator Lead', access).map((item) => item.label)).toEqual(labels);
   });
 
-  test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)(
+  test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff'] as const)(
     '[NORMAL] [SG2-86:AC4] %s navigation does not wait on loaded permissions',
     (role) => {
       expect(navFor(role)).toEqual(navFor(role, { userId: 'user-1', role: 'any', permissions: [] }));
       expect(navFor(role).length).toBeGreaterThan(1);
     },
   );
+
+  test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-62:AC1] attendee navigation exposes only authenticated grants', () => {
+    expect(navFor('Attendee')).toEqual([]);
+    expect(navFor('Attendee', { userId: 'attendee-1', role: 'attendee', permissions: [] })).toEqual([]);
+    expect(navFor('Attendee', { userId: 'attendee-1', role: 'attendee', permissions: ['events.registrable.read'] }))
+      .toEqual([{ screen: 'findEvents', label: 'Find events' }]);
+    expect(navFor('Attendee', { userId: 'attendee-1', role: 'attendee',
+      permissions: ['events.registrable.read', 'registrations.mine.read'] })).toEqual([
+      { screen: 'findEvents', label: 'Find events' },
+      { screen: 'myRegistrations', label: 'My registrations' },
+    ]);
+  });
 
   test('[NORMAL] [SG2-86:AC2] the Lead\'s primary action is assigning coordinators; the Safety Officer\'s is their profile', () => {
     expect(primaryActionFor('Event Coordinator Lead')).toEqual({ label: 'Assign coordinators', screen: 'assign' });

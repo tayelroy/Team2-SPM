@@ -127,12 +127,10 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['findEvent', 'Find an event', 'events.search'],
   ],
   Attendee: [
-    ['dashboard', 'Dashboard'],
     // SG2-59: the confirmed events open, or opening, for registration.
     ['findEvents', 'Find events', 'events.registrable.read'],
     // SG2-62: the attendee's own registrations, which they can withdraw.
     ['myRegistrations', 'My registrations', 'registrations.mine.read'],
-    ['attendee', 'Event page'],
   ],
   // SG2-86: only screens the role can use. Each functional item is gated on
   // the permission its screen needs, so a role is never offered a page that
@@ -185,8 +183,7 @@ export const HEAD: Record<
       'Equipment requests and reservations for your team. Open a request to review stock and placement.',
   },
   Attendee: {
-    eyebrow: 'Attendee · J. Halloran',
-    // SG2-62: 'My registrations' is now the real list in the menu.
+    eyebrow: 'Attendee',
     title: 'Attendee home',
     blurb:
       "Events you can register for and the ones you're already on the list for.",
@@ -431,13 +428,6 @@ export const NEXT_STEPS = [
     n: '04',
     text: "You're notified when the event is confirmed; registration then opens.",
   },
-];
-
-export const ATTENDEE_FACTS = [
-  { label: 'Date', value: '12 Oct 2026' },
-  { label: 'Time', value: '10:00 – 17:00' },
-  { label: 'Venue', value: 'Atrium Hall, Level 1' },
-  { label: 'Places left', value: '42 of 180' },
 ];
 
 export const FOOTER_LINKS = [
