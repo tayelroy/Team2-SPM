@@ -1001,14 +1001,14 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **200:**
   - `event`: `{ event_id, name, status }`
   - `requests[]`: `{ request_id, equipment_id, equipment_type, quantity, notes, status, arrangement_notes, shortfall, placement_venue_id, placement_venue_name, placement_position, version }`
-  - `equipment[]`, `venues[]`
+  - `equipment[]`, `venues[]` (`venues` lists only the event's placement venues: pending/approved venue requests or confirmed bookings for the event)
   - `can_request`, `can_arrange`
 - **Errors:**
   - 400 `Choose a valid event.`
   - 404 `Event or equipment request not found.`
   - 400 `Check the equipment, quantity, shortfall and placement values.`
 - **Rule:** an EC only for their own events.
-- **Data:** RPC `manage_equipment_requirements('read', …)`. The latest definition is in `202610140002_equipment_reserved_shortfall.sql`.
+- **Data:** RPC `manage_equipment_requirements('read', …)`. The latest definition is in `202610290003_equipment_placement_event_venues.sql`.
 
 ### 9.5 POST /api/equipment-requests
 - **Week 7:** New since W7 — SG2-53.
@@ -1044,9 +1044,11 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - `event_id`, `version`
   - `shortfall`: 0 or more
   - `arrangement_notes`: optional
-  - `placement_venue_id` and `placement_position`: either both set or both null
+  - `placement_venue_id` and `placement_position`: either both set or both null; the venue must be one the event has requested (pending or approved) or booked (confirmed)
 - **200:** RequirementsView.
-- **Errors:** as 9.6.
+- **Errors:**
+  - as 9.6
+  - 409 `Choose a venue this event has requested or booked.`
 - **Data:** RPC `manage_equipment_requirements('arrange', …)`.
 
 ### 9.8 GET /api/equipment-requests/:requestId/availability

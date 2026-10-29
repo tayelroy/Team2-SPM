@@ -467,6 +467,9 @@ app.get('/__e2e/event-notifications-ledger', (_req, res) => res.json({
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
+  // SG2-53 AC6: the event's one venue, Regression Hall; Quiet Room is not its venue.
+  database.tables.venue_bookings.push({ booking_id: 530, venue_id: 1, event_id: 53, starts_at: '2030-06-20T02:00:00.000Z',
+    ends_at: '2030-06-20T06:00:00.000Z', status: 'confirmed' });
   database.tables.equipment.push({ equipment_id: 2, name: 'Portable projector', description: 'HDMI projector',
     quantity_total: 2, location: 'Store B', operational_status: 'maintenance', version: 1 });
   res.status(204).end();

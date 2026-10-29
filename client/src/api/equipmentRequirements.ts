@@ -22,7 +22,7 @@ export class EquipmentRequirementsError extends Error {
       401: 'Your session has expired. Sign in again.',
       403: 'You do not have permission to access or change these equipment requirements.',
       404: 'This event or equipment request is no longer available to you.',
-      409: 'This request changed, is no longer editable, or duplicates existing equipment. Reload requirements before trying again.',
+      409: 'This request changed, is no longer editable, duplicates existing equipment, or is placed at a venue this event has not requested or booked. Reload requirements before trying again.',
     };
     super(messages[status] ?? 'Unable to reach the equipment requirements service. Please try again.');
   }

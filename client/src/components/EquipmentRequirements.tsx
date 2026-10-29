@@ -131,6 +131,9 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
   const shortfallValue = fullyReserved ? '0' : shortfall;
   const [venue, setVenue] = useState(record?.placement_venue_id == null ? '' : String(record.placement_venue_id));
   const [position, setPosition] = useState(record?.placement_position ?? '');
+  // SG2-53 AC6: a saved placement at a venue the event no longer requests or
+  // books stays visible, but cannot be saved again until support picks another.
+  const stalePlacement = arranging && record!.placement_venue_id !== null && !view.venues.some(item => item.venue_id === record!.placement_venue_id);
   const [invalid, setInvalid] = useState(false);
   const title = arranging ? 'Update equipment arrangement' : record ? 'Edit equipment requirement' : 'Add equipment requirement';
   function submit(event: FormEvent) {
@@ -158,9 +161,10 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
           <p style={{ margin: 0, color: color.silver }}>{fullyReserved ? 'This requirement is fully reserved. Shortfall stays at 0; you can still update notes and placement.' : 'Enter 0 when the requirement is fully covered. The shortfall cannot exceed the quantity requested.'}</p>
           <label htmlFor={`${id}-venue`} style={fieldStyle}>Placement venue<select id={`${id}-venue`} style={inputStyle} value={venue} onChange={event => setVenue(event.target.value)}>
             <option value="">Not recorded</option>{view.venues.map(item => <option key={item.venue_id} value={item.venue_id}>{item.name}</option>)}
+            {stalePlacement ? <option value={record!.placement_venue_id!} disabled>{record!.placement_venue_name} (not requested or booked for this event)</option> : null}
           </select></label>
           <label htmlFor={`${id}-position`} style={fieldStyle}>Placement position<textarea id={`${id}-position`} rows={2} style={inputStyle} value={position} onChange={event => setPosition(event.target.value)} /></label>
-          <p style={{ margin: 0, color: color.silver }}>Record both a venue and a position, or leave both blank. Safety Officers can read this placement.</p>
+          <p style={{ margin: 0, color: color.silver }}>Record both a venue and a position, or leave both blank. Only venues this event has requested or booked can be chosen. Safety Officers can read this placement.</p>
         </> : <>
           <label htmlFor={`${id}-equipment`} style={fieldStyle}>Equipment type<select id={`${id}-equipment`} required style={inputStyle} value={equipment} onChange={event => setEquipment(event.target.value)}>
             <option value="">Choose equipment</option>{view.equipment.map(item => <option key={item.equipment_id} value={item.equipment_id}>{item.type}</option>)}
@@ -171,7 +175,7 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
         </>}
       </fieldset>
       <p style={{ color: color.silver }}>Notes and placement position allow up to 2,000 characters each.</p>
-      {invalid ? <p role="alert">{arranging ? 'Enter a whole-number shortfall from 0 to the requested quantity, keep text within 2,000 characters, and record both placement fields or neither.' : 'Choose equipment, enter a whole-number quantity from 1 to 2,147,483,647, and keep technical notes within 2,000 characters.'}</p> : null}
+      {invalid ? <p role="alert">{arranging ? 'Enter a whole-number shortfall from 0 to the requested quantity, keep text within 2,000 characters, and record both placement fields or neither, using a venue this event has requested or booked.' : 'Choose equipment, enter a whole-number quantity from 1 to 2,147,483,647, and keep technical notes within 2,000 characters.'}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
         <button className="organisation-button organisation-button-primary" type="submit" disabled={saving || conflict}>{saving ? 'Saving…' : arranging ? 'Save equipment arrangement' : 'Save equipment requirement'}</button>

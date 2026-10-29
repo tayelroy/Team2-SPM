@@ -31,7 +31,7 @@ test('[NORMAL] [SG2-53:AC5] [SG2-53:AC6] support saves shortfall and per-item pl
 test.each([
   [400, 'Check the equipment, quantities, notes and placement before saving.'], [401, 'Your session has expired. Sign in again.'],
   [403, 'You do not have permission to access or change these equipment requirements.'], [404, 'This event or equipment request is no longer available to you.'],
-  [409, 'This request changed, is no longer editable, or duplicates existing equipment. Reload requirements before trying again.'],
+  [409, 'This request changed, is no longer editable, duplicates existing equipment, or is placed at a venue this event has not requested or booked. Reload requirements before trying again.'],
   [503, 'Unable to reach the equipment requirements service. Please try again.'],
 ])('[FAILURE] [SG2-53:AC1] [SG2-53:AC3] HTTP %i preserves its status and a safe recovery message', async (status, message) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'private server detail' }, { status })));

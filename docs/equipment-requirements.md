@@ -14,7 +14,7 @@ the saved information. Jira's six acceptance criteria were verified on 8 October
 | AC3 | Zero, negative, fractional and nonnumeric quantities refused before storage | Router/component validation, SQL limits and SG2-53-B01 |
 | AC4 | A new requirement appears in Technical Support Staff's pending dashboard queue | Real queue SQL contract and SG2-53-P01 handoff |
 | AC5 | Support saves arrangement notes and a shortfall; the coordinator sees both | Arrangement RPC/component tests and SG2-53-P01/P02 |
-| AC6 | Each item has a venue/position pair, visible to Safety Officer through the read-only API; absent placement says **Not recorded** | Role/placement SQL checks and SG2-53-P01/P02; full SG2-91 safety workflow is subsequent work |
+| AC6 | Each item has a venue/position pair, visible to Safety Officer through the read-only API; absent placement says **Not recorded**; the venue must be one the event has requested or booked | Role/placement SQL checks (including `placement-unrelated-venue-refused`, `placement-pending-request-venue`, `placement-booked-venue`, `placement-venue-choices`) and SG2-53-P01/P02; full SG2-91 safety workflow is subsequent work |
 
 Requests describe demand. They do not reserve equipment, promise available stock
 or change quantity held. Maintenance/damaged catalogue types remain selectable
@@ -37,13 +37,25 @@ its Technical Support Staff-only permission.
 | `PATCH /api/equipment-requests/:requestId` | Requirement fields, `event_id`, `version` | 200 complete view |
 | `PATCH /api/equipment-requests/:requestId/arrangement` | `event_id`, `version`, `arrangement_notes`, `shortfall`, `placement_venue_id`, `placement_position` | 200 complete view |
 
-The view contains event identity/status, requirements, equipment/venue choices and
-`can_request`/`can_arrange`. Each requirement carries its version. Quantity is an
+The view contains event identity/status, requirements, equipment choices, the
+event's placement venue choices and `can_request`/`can_arrange`. Each requirement carries its version. Quantity is an
 integer from 1 to 2,147,483,647. Optional notes and placement position are trimmed,
 blank becomes null, and new text allows up to 2,000 Unicode code points. Shortfall
 is an integer from zero to the requested quantity: zero means support recorded no
 shortfall, whereas null displays **Not recorded**. Placement is either absent or
 both a valid venue and nonblank position.
+
+The placement venue must be one the event uses: a venue with a pending or approved
+venue booking request for the event, or a confirmed venue booking for it. Pending
+requests count, so Technical Support can plan while Venue Staff decide. Rejected or
+cancelled requests, released bookings and other events' venues do not; saving one
+returns 409 "Choose a venue this event has requested or booked." The view's
+`venues` list holds exactly these venues, so the Placement venue dropdown offers
+nothing else (hosted QA on 29 October 2026 saved event #48's microphones at a
+venue it had never requested). Existing placements are not rewritten: one whose
+venue no longer qualifies stays readable, is shown in the editor as "not requested
+or booked for this event", and must be changed or cleared before the arrangement
+can be saved again.
 
 An amendment resets arrangement notes, shortfall and placement to null. The editor
 states this before saving so support can reassess the changed requirement.
@@ -56,7 +68,9 @@ reload. Event/session changes cancel stale loads and saves.
 ## Database and deployment
 
 Apply `supabase/migrations/202610080001_equipment_requirements.sql` after the
-existing migrations **before deploying this branch**. No new environment variables,
+existing migrations **before deploying this branch**. The placement venue rule
+above is `supabase/migrations/202610290003_equipment_placement_event_venues.sql`,
+which replaces `manage_equipment_requirements` and changes no data. No new environment variables,
 paid feature, scheduler, plan or billing change is required. This task does not
 apply SG2-53 to hosted Supabase.
 

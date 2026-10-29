@@ -4005,16 +4005,16 @@
   },
   {
     "id": "SG2-53-P01",
-    "title": "coordinator requests reach support and saved shortfall and placement return to the coordinator",
+    "title": "coordinator requests reach support, placement is limited to the event's venues, and saved shortfall and placement return to the coordinator",
     "type": "NORMAL",
     "story": "SG2-53",
-    "purpose": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "purpose": "Exact stored versions 1/2/3, all fields persisted, placement offered and accepted only at the event's own venue, stock remains 20/version 1 and amendment resets arrangement fields.",
     "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
     "steps": [
-      "Create four microphone requirements at 1440px, reload, arrange a shortfall of two with venue/position as support, read as Safety Officer and coordinator, then amend to six."
+      "Create four microphone requirements at 1440px, reload, open the arrangement as support and check the Placement venue choices, attempt a placement at Quiet Room through the API, arrange a shortfall of two with venue/position, read as Safety Officer and coordinator, then amend to six."
     ],
-    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
-    "expected": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "data": "Event 53 with a confirmed booking at venue 1 Regression Hall; venue 2 Quiet Room is not the event's venue; equipment 1 microphones (20 units), equipment 2 projector under maintenance; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Placement venue lists only Not recorded and Regression Hall; the Quiet Room placement returns 409 'Choose a venue this event has requested or booked.' and leaves version 1 unchanged; exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
     "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -4028,9 +4028,9 @@
       "SG2-53:AC6"
     ],
     "status": "Pass",
-    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
-    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
-    "execution_date": "8 Oct 2026",
+    "actual": "Passed in the SG2-53 placement-venue Chromium run (equipment-requirements, equipment-reservations, equipment-availability and week7-journey specs); only the event's venue was offered, the other venue was refused with 409, and exact persisted fields and visible outcomes were checked.",
+    "execution_evidence": "29 Oct 2026; bugfix/SG2-53-placement-event-venues; isolated Playwright Chromium against the in-memory fixture. Hosted results are recorded in the PR.",
+    "execution_date": "29 Oct 2026",
     "executed_by": "Automated test runner",
     "review": {
       "date": "2026-10-08",

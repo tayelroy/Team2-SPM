@@ -201,6 +201,9 @@ insert into public.venue_bookings(event_id,venue_id,starts_at,ends_at,status)
  values(95519,95501,'2031-10-03T09:00Z','2031-10-03T17:00Z','confirmed');
 insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved) values(95519,95504,10);
 update public.equipment_requests set equipment_id=95504 where request_id=95505;
+-- SG2-53 AC6: 95516's placement below names a venue the event has requested.
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at)
+ values(95516,95501,'2031-10-07T09:00Z','2031-10-07T17:00Z');
 set local role authenticated;
 do $$
 begin

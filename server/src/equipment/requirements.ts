@@ -39,7 +39,8 @@ const refusals = {
   closed: [409, 'This event or request is no longer being arranged. Refresh before continuing.'],
   conflict: [409, 'This request changed. Refresh before saving again.'],
   duplicate: [409, 'This equipment already has a pending request for the event.'],
-  invalid: [400, 'Check the equipment, quantity, shortfall and placement values.']
+  invalid: [400, 'Check the equipment, quantity, shortfall and placement values.'],
+  venue: [409, 'Choose a venue this event has requested or booked.']
 } as const;
 
 export function createEquipmentRequirementsRouter(access: ReturnType<typeof createAuthorization>, store = createEquipmentRequirementsStore) {
