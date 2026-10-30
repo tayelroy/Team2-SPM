@@ -13,11 +13,14 @@ import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
+/** The clock the handler judges proposed dates against (SG2-30 AC2), fixed so no result depends on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 const COMPLETE_BODY = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
   description: 'Half-day forum with keynotes and a reception.',
-  proposed_date: '2030-11-04T09:00:00.000Z',
+  proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: 'Theatre',
@@ -62,6 +65,7 @@ function buildApp(options: HarnessOptions = {}) {
     createUpdateEventDraftHandler({
       getPrincipal: () => ('principal' in options ? options.principal : ORGANISER),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
+      now: () => NOW,
       fetchOwnRequest: async (_admin, eventId, organiserId) => {
         options.captureFetch?.(eventId, organiserId);
         return options.fetchResult ?? { ok: true, request: DRAFT_REQUEST };

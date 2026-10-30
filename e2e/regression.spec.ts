@@ -471,29 +471,37 @@ test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] 
   const records = await eventRecords(page);
   expect(records).toHaveLength(2); // one seeded own draft + one newly-created draft
   const created = records.find(r => r.name === 'Partial draft')!;
-  const headers = await authHeaders(page);
-  expect((await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers })).status()).toBe(400);
+  expect((await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers: await authHeaders(page) })).status()).toBe(400);
   expect((await eventRecords(page)).find(r => r.event_id === created.event_id)?.status).toBe('draft');
-  // SG2-30 AC2: completing it with a date already gone still saves, but the
-  // date is outstanding, submission is refused and it stays a draft.
-  const pastDated = await page.request.patch(`/api/event-requests/${created.event_id}`, { headers, data: {
-    name: 'Partial draft', purpose: 'Team planning', description: 'Review the release plan',
-    proposed_date: '2026-09-01T02:00:00.000Z', expected_attendance: 25, venue_requirements: 'Projector',
-    preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false } });
-  expect([pastDated.status(), (await pastDated.json()).missingForSubmission]).toEqual([200, ['proposed_date_in_past']]);
-  const refused = await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers });
+});
+
+test('SG2-30-N01 | [SG2-30:AC2] [SG2-28:AC4] [FAILURE] a complete request dated in the past is saved as a draft but cannot be submitted until its date moves forward', async ({ page }) => {
+  // 1 Sep 2026 has passed for both the pinned browser clock (22 Sep 2026) and the server.
+  await signIn(page);
+  await nav(page, 'New request');
+  await fillEvent(page, 'Past forum');
+  await page.getByLabel(/^Date/).fill('2026-09-01T10:00');
+  await expect(page.getByText('Date must be in the future', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
+
+  // It still saves, but the save names the date as what stands in the way.
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText(/^Draft \d+ saved\. Still needed to submit: Date must be in the future\.$/)).toBeVisible();
+  const created = (await eventRecords(page)).find(r => r.name === 'Past forum')!;
+  expect(created.status).toBe('draft');
+
+  // The server refuses it too, lists the date and leaves it a draft.
+  const refused = await page.request.patch(`/api/event-requests/${created.event_id}/submit`, { headers: await authHeaders(page) });
   expect([refused.status(), await refused.json()]).toEqual([400,
     { error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past'] }]);
   expect((await eventRecords(page)).find(r => r.event_id === created.event_id)?.status).toBe('draft');
-  // Reopened from My drafts, the form names the problem and will not submit.
-  await nav(page, 'My drafts');
-  await page.getByRole('region', { name: 'My draft requests', exact: true }).locator('div')
-    .filter({ has: page.getByRole('heading', { name: 'Partial draft', exact: true }) })
-    .filter({ has: page.getByRole('button', { name: 'Edit', exact: true }) }).last()
-    .getByRole('button', { name: 'Edit', exact: true }).click();
-  await expect(page.getByLabel(/^Date/)).toHaveValue('2026-09-01T10:00');
-  await expect(page.getByText('Date must be in the future', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
+
+  // Moving the date forward clears the item and the request submits.
+  await page.getByLabel(/^Date/).fill('2030-06-15T17:00');
+  await expect(page.getByText('Date must be in the future', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Past forum has been submitted for review.' })).toBeVisible();
+  expect((await eventRecords(page)).find(r => r.event_id === created.event_id)?.status).toBe('unassigned');
 });
 
 test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then submitting preserves the latest field values', async ({ page }) => {
@@ -1634,6 +1642,34 @@ test('SG2-48-P01 | [SG2-48:AC1] [SG2-48:AC2] [SG2-48:AC3] [NORMAL] a coordinator
     await expect(detail.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd')).toHaveText(value);
   }
   await expect(detail.getByText(/20 Jun 2030, 09:00 – 20 Jun 2030, 12:00/)).toBeVisible();
+});
+
+test('SG2-48-P03 | [SG2-48:AC1] [SG2-46:AC1] [NORMAL] the event\'s preferred layout pre-fills the search and the request, even when the venue lists another layout first', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  // Venue Staff list Classroom before Theatre, so a Theatre default can only come from the event's preference.
+  const login = await request.post('/api/auth/login', { data: { email: 'venue@example.test', password: 'Regression123!' } });
+  const staff = { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  expect((await request.put('/api/venues/1/layouts', { headers: staff,
+    data: { layouts: [{ layout: 'classroom' }, { layout: 'theatre' }] } })).status()).toBe(200);
+
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  // Venue Request Forum prefers "Theatre": the search starts on that layout.
+  await expect(page.getByLabel('Layout', { exact: true })).toHaveValue('theatre');
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+
+  // Widening the search to any layout still requests the preferred one, not the venue's first.
+  await page.getByLabel('Layout', { exact: true }).selectOption('');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const card = venueCard(page, 'Regression Hall');
+  await card.getByRole('button', { name: 'Request this venue', exact: true }).click();
+  await expect(card.getByLabel('Required layout')).toHaveValue('theatre');
+  await sendVenueRequest(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.', { exact: true })).toBeVisible();
+
+  const stored = await page.request.get('/api/venue-booking-requests?event_id=91', { headers: await authHeaders(page) });
+  expect((await stored.json()).requests.map((row: { venue_id: number; layout: string }) => [row.venue_id, row.layout]))
+    .toEqual([[1, 'theatre']]);
 });
 
 test('SG2-48-P02 | [SG2-48:AC4] [NORMAL] one event requests several different venues, each pending on its own', async ({ page, request }) => {

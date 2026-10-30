@@ -26,11 +26,14 @@ const REQUIRED_FOR_SUBMISSION = [
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
+/** The clock the handlers judge proposed dates against (SG2-30 AC2), fixed so results never depend on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 const COMPLETE_BODY = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
   description: 'Half-day forum with keynotes and a reception.',
-  proposed_date: '2030-11-04T09:00:00.000Z',
+  proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: 'Theatre',
@@ -63,6 +66,7 @@ function buildApp(options: HarnessOptions = {}) {
         options.admin === undefined ? ({} as SupabaseClient) : options.admin,
       lookupOrganisation: async () =>
         options.lookup ?? { ok: true, organisation: 'ConnectSphere Test' },
+      now: () => NOW,
       insertDraft: async (_admin, draft) => {
         options.captureInsert?.(draft);
         return (
@@ -407,7 +411,7 @@ describe('missingForSubmission', () => {
       name: null,
       purpose: '',
       // description is deliberately omitted to exercise undefined.
-      proposed_date: '2030-11-04T09:00:00.000Z',
+      proposed_date: '2026-11-04T09:00:00.000Z',
       expected_attendance: 10,
       venue_requirements: 'Stage',
       preferred_layout: 'Theatre',
@@ -415,27 +419,26 @@ describe('missingForSubmission', () => {
       equipment_requirements: 'None',
       registration_needed: false,
       category: 'seminar'
-    });
+    }, NOW);
     assert.deepEqual(missing, ['name', 'purpose', 'description']);
   });
 
   test('[FAILURE] [SG2-105:AC1] accessibility, equipment, layout and registration now block submission when unanswered (replaces SG2-28 AC2)', () => {
     assert.deepEqual(missingForSubmission({
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
-      proposed_date: '2030-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
-    }), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
+      proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
+    }, NOW), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
   });
 
   test('[BOUNDARY] [SG2-30:AC2] a date not after now is listed as outstanding; a blank one is only reported as missing', () => {
-    const now = Date.parse('2026-10-29T03:00:00.000Z');
     const complete = {
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session', expected_attendance: 10,
       venue_requirements: 'Stage', preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None',
       registration_needed: false
     };
-    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:00:00.000Z' }, now), ['proposed_date_in_past']);
-    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:01:00.000Z' }, now), []);
-    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: null }, now), ['proposed_date']);
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:00:00.000Z' }, NOW), ['proposed_date_in_past']);
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: '2026-10-29T03:00:00.001Z' }, NOW), []);
+    assert.deepEqual(missingForSubmission({ ...complete, proposed_date: null }, NOW), ['proposed_date']);
   });
 });
 

@@ -238,7 +238,7 @@ export type OutstandingItem = DraftField | typeof PROPOSED_DATE_IN_PAST;
  * `now`. Shown to the client without blocking the save (SG2-28: "fields
  * required for submission are identified") and enforced by submission.
  */
-export function missingForSubmission(values: Partial<DraftValues>, now: number = Date.now()): OutstandingItem[] {
+export function missingForSubmission(values: Partial<DraftValues>, now: number): OutstandingItem[] {
   const outstanding: OutstandingItem[] = SUBMISSION_REQUIRED_FIELDS.filter((field) => {
     const value = values[field];
     return value === undefined || value === null || value === '';

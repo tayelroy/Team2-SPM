@@ -15,6 +15,9 @@ import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
+/** The clock submission judges proposed dates against (SG2-30 AC2), fixed so no result depends on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 const COMPLETE_DRAFT = {
   event_id: 7,
   organiser_id: 'user-1',
@@ -23,7 +26,7 @@ const COMPLETE_DRAFT = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
   description: 'Quarterly partner networking session.',
-  proposed_date: '2030-11-04T09:00:00.000Z',
+  proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: 'Theatre',
@@ -77,7 +80,7 @@ function buildApp(options: HarnessOptions = {}) {
         notices.push(batch);
         return options.notifyResult ?? { ok: true };
       },
-      ...(options.now === undefined ? {} : { now: () => options.now as number })
+      now: () => options.now ?? NOW
     })
   );
   return Object.assign(app, { history, notices, leadReads });
@@ -337,7 +340,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
   test('[FAILURE] [SG2-30:AC2] a complete draft dated in the past is refused, listing the date as outstanding, and stays a draft', async () => {
     let writes = 0;
     const app = buildApp({
-      now: Date.parse('2026-10-29T03:00:00.000Z'),
+      now: NOW,
       captureSubmit: () => { writes++; },
       fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-01T02:00:00.000Z' } }
     });
@@ -353,7 +356,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
   test('[FAILURE] [SG2-30:AC2] [SG2-36:AC2] a past date is listed alongside blank fields, and a rejected request with one is not resubmitted', async () => {
     let writes = 0;
     const response = await request(buildApp({
-      now: Date.parse('2026-10-29T03:00:00.000Z'),
+      now: NOW,
       captureSubmit: () => { writes++; },
       fetchResult: { ok: true, request: {
         ...COMPLETE_DRAFT, status: 'rejected', name: null, proposed_date: '2026-10-01T02:00:00.000Z'
@@ -364,18 +367,17 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('[BOUNDARY] [SG2-30:AC2] a date at the current instant is refused, one minute later is submitted', async () => {
-    const now = Date.parse('2026-10-29T03:00:00.000Z');
+  test('[BOUNDARY] [SG2-30:AC2] a date at the current instant is refused, one millisecond later is submitted', async () => {
     const atNow = await request(buildApp({
-      now, fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:00:00.000Z' } }
+      now: NOW, fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:00:00.000Z' } }
     })).patch('/api/event-requests/7/submit');
     assert.deepEqual([atNow.status, atNow.body.missing], [400, ['proposed_date_in_past']]);
     let submitted: number | undefined;
-    const oneMinuteLater = await request(buildApp({
-      now, captureSubmit: eventId => (submitted = eventId),
-      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:01:00.000Z' } }
+    const oneMillisecondLater = await request(buildApp({
+      now: NOW, captureSubmit: eventId => (submitted = eventId),
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:00:00.001Z' } }
     })).patch('/api/event-requests/7/submit');
-    assert.equal(oneMinuteLater.status, 200);
+    assert.equal(oneMillisecondLater.status, 200);
     assert.equal(submitted, 7);
   });
 

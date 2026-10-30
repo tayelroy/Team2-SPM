@@ -25,6 +25,8 @@ export interface CreateEventDraftDependencies {
     admin: SupabaseClient,
     draft: { organiserId: string; organisation: string | null; values: DraftValues }
   ) => Promise<CreateDraftResult>;
+  /** The clock a proposed date must be after to be submittable (SG2-30 AC2). */
+  now?: () => number;
 }
 
 /**
@@ -39,7 +41,8 @@ export function createEventDraftHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   lookupOrganisation = fetchOrganiserOrganisation,
-  insertDraft = insertEventRequestDraft
+  insertDraft = insertEventRequestDraft,
+  now = Date.now
 }: CreateEventDraftDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -89,7 +92,7 @@ export function createEventDraftHandler({
 
     res.status(201).json({
       request: created.request,
-      missingForSubmission: missingForSubmission(created.request)
+      missingForSubmission: missingForSubmission(created.request, now())
     });
   };
 }

@@ -502,12 +502,10 @@
     "steps": [
       "Open New request with no fields and verify Submit request is disabled.",
       "Save the empty draft, name it Partial draft and save again.",
-      "Read the request list and attempt submission through the fixture API.",
-      "Complete the draft with a proposed date of 1 Sep 2026 (already past), save it and attempt submission again.",
-      "Reopen it from My drafts and check the date field and Submit request."
+      "Read the request list and attempt submission through the fixture API."
     ],
-    "data": "Initially empty fields; then name Partial draft only; then every field with proposed date 2026-09-01T02:00Z (past)",
-    "expected": "One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft. The past-dated save returns 200 with missingForSubmission ['proposed_date_in_past']; its submission returns 400 'proposed_date must be in the future.' and it stays a draft; reopened, the form shows 'Date must be in the future' and Submit request is disabled.",
+    "data": "Initially empty fields; then name Partial draft only",
+    "expected": "One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -543,6 +541,36 @@
       "SG2-30:AC2"
     ],
     "method_id": "SG2-28:an-empty-draft-saves-once-but-cannot-be-submitted"
+  },
+  {
+    "id": "SG2-30-N01",
+    "title": "A complete request dated in the past is saved as a draft but cannot be submitted until its date moves forward",
+    "type": "Negative",
+    "story": "SG2-30",
+    "purpose": "Verify AC2 for a date that has already passed (hosted QA 29 Oct 2026: a request dated 1 Oct 2026 was submitted and reached the Lead's queue). The form and the server must both refuse it, list the date as outstanding and keep the request a draft; moving the date forward clears it.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as the organiser, open New request and fill every field with date 1 Sep 2026 10:00 SGT.",
+      "Check the date error and Submit request, then Save draft.",
+      "Submit the saved draft through the fixture API and read its status.",
+      "Change the date to 15 Jun 2030 17:00 SGT and submit from the form."
+    ],
+    "data": "Past forum; every required answer; proposed date 2026-09-01T02:00:00.000Z (past for the pinned browser clock, 22 Sep 2026, and for the server), then 2030-06-15T09:00:00.000Z",
+    "expected": "The form shows 'Date must be in the future' and Submit request is disabled; the save reports 'Draft N saved. Still needed to submit: Date must be in the future.'; the API submission returns 400 {error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past']} and the request stays a draft; after moving the date the error clears, the request is submitted and its status is unassigned.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally on the PR #125 branch; fails on main (no date error, submission accepted).",
+    "execution_evidence": "30 Oct 2026; PR #125 branch on main 864c92e; local production build, Playwright Chromium, e2e/regression.spec.ts -g SG2-30-N01: passed.",
+    "execution_date": "30 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC2",
+      "SG2-28:AC4"
+    ]
   },
   {
     "id": "SG2-29-P01",
@@ -3183,6 +3211,36 @@
         "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
         "execution_date": "5 Oct 2026"
       }
+    ]
+  },
+  {
+    "id": "SG2-48-P03",
+    "title": "The event's preferred layout pre-fills the search and the request, even when the venue lists another layout first",
+    "type": "Positive",
+    "story": "SG2-48",
+    "purpose": "Verify AC1 (the request carries the event's required layout) for hosted QA 29 Oct 2026, where a Theatre event was booked into E2E16-VN Hall A as Classroom, that venue's first layout. The venue here lists Classroom before Theatre, so a Theatre default can only come from the event.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Venue Staff set Regression Hall's layouts to classroom then theatre through the API.",
+    "steps": [
+      "Seed the venue request fixture; as Venue Staff, set Regression Hall's layouts to classroom and theatre.",
+      "Sign in as coordinator and open venue search from Venue Request Forum; read the Layout filter.",
+      "Set Layout to Any layout and search again; open Request this venue on Regression Hall and read Required layout.",
+      "Send the request for 09:00–12:00 on 20 June 2030 and read the event's venue requests through the API."
+    ],
+    "data": "Event 91 (preferred layout Theatre, 80 guests); Regression Hall (venue 1, layouts classroom then theatre)",
+    "expected": "Layout is pre-filled with theatre and one venue is listed; with the filter cleared, Required layout still defaults to theatre; the stored request for event 91 is venue 1 with layout theatre.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally on the PR #125 branch; fails on main (Layout filter empty).",
+    "execution_evidence": "30 Oct 2026; PR #125 branch on main 864c92e; local production build, Playwright Chromium, e2e/regression.spec.ts -g SG2-48-P03: passed.",
+    "execution_date": "30 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC1",
+      "SG2-46:AC1"
     ]
   },
   {

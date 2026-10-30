@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import App from './App';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
@@ -15,6 +15,12 @@ afterEach(() => {
   sessionStorage.clear();
   vi.useRealTimers();
 });
+
+/** SG2-30 AC2 compares proposed dates with the current time; request-form tests run at this fixed instant (the browser suite's 22 Sep 2026), so their October 2026 dates stay in the future whenever they run. */
+function fixClock() {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-22T00:00:00.000Z'));
+}
 
 // jsdom has no canvas implementation; the orb hook is written to no-op when
 // there is no 2D context, and stubbing this keeps the console clean.
@@ -505,6 +511,7 @@ test('[NORMAL] [SG2-41:AC4] the signed-in coordinator opens the actual selected 
 });
 
 describe('the events table', () => {
+  beforeEach(fixClock);
   test('[FAILURE] [SG2-26:AC2] a coordinator is not offered the organisation event list or detail, and the list still refuses them', async () => {
     await signInAs('Event Coordinator');
     const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -533,7 +540,7 @@ describe('the events table', () => {
               name: 'Annual General Meeting',
               purpose: 'AGM 2026',
               description: 'Yearly shareholder meeting',
-              proposed_date: '2030-10-25T10:00:00.000Z',
+              proposed_date: '2026-10-25T10:00:00.000Z',
               expected_attendance: 120,
               venue_requirements: 'Auditorium',
               accessibility_needs: 'Wheelchair ramp',
@@ -550,7 +557,7 @@ describe('the events table', () => {
               {
                 event_id: 101,
                 name: 'Annual General Meeting',
-                proposed_date: '2030-10-25T10:00:00.000Z',
+                proposed_date: '2026-10-25T10:00:00.000Z',
                 status: 'draft',
                 coordinator_id: null,
                 coordinator_name: null,
@@ -612,6 +619,7 @@ describe('the event detail action panel', () => {
 });
 
 describe('the request form', () => {
+  beforeEach(fixClock);
   const openForm = async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
@@ -654,7 +662,7 @@ describe('the request form', () => {
     const submitted = {
       event_id: 42, name: 'Investor Forum 2026', status: 'submitted', organiser_id: 'user-1',
       purpose: 'Partner briefing', description: 'A half-day forum with two keynotes and a panel.',
-      proposed_date: '2030-10-12T00:00:00.000Z', expected_attendance: 180,
+      proposed_date: '2026-10-12T00:00:00.000Z', expected_attendance: 180,
       venue_requirements: 'Stage + loop', can_manage: true,
     };
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -686,7 +694,7 @@ describe('the request form', () => {
     // AC2: fill all required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.
@@ -719,7 +727,7 @@ describe('the request form', () => {
     expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     // 08:00 on 12 Oct in Singapore is midnight UTC.
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({
-      name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2030-10-12T00:00:00.000Z',
+      name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2026-10-12T00:00:00.000Z',
     });
   });
 
@@ -727,7 +735,7 @@ describe('the request form', () => {
     await openForm();
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.
@@ -774,6 +782,7 @@ describe('the request form', () => {
 });
 
 describe('editing a draft (SG2-29)', () => {
+  beforeEach(fixClock);
   test('[NORMAL] [SG2-29:AC2] [SG2-30:AC1] Edit opens the form pre-filled, and a successful submit confirms the named event on its detail page', async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'My drafts' }));
@@ -784,7 +793,7 @@ describe('editing a draft (SG2-29)', () => {
 
     // AC2: fill the remaining required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-10-12T08:00' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     // SG2-105: the rest of the customer's minimum.
