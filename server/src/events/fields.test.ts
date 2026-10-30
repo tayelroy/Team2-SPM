@@ -9,6 +9,9 @@ import {
   type DraftValues
 } from './fields';
 
+/** The instant proposed dates are judged against (SG2-30 AC2), fixed so no result depends on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 describe('the customer minimum for submission (SG2-105)', () => {
   // Customer clarification session 2 is the oracle, written out independently of the validator.
   const CUSTOMER_MINIMUM = [
@@ -24,21 +27,21 @@ describe('the customer minimum for submission (SG2-105)', () => {
 
   test('[NORMAL] [SG2-105:AC1] submission requires every field the customer listed, layout included', () => {
     assert.deepEqual([...SUBMISSION_REQUIRED_FIELDS], CUSTOMER_MINIMUM);
-    assert.deepEqual(missingForSubmission(COMPLETE), []);
+    assert.deepEqual(missingForSubmission(COMPLETE, NOW), []);
   });
 
   test('[BOUNDARY] [SG2-105:AC2] "None" answers accessibility needs and equipment requirements, but blank does not', () => {
     const blank = validateDraftInput({ ...COMPLETE, accessibility_needs: '   ', equipment_requirements: '' });
     assert.equal(blank.valid, true);
-    assert.deepEqual(missingForSubmission(blank.valid ? blank.values : {}), ['accessibility_needs', 'equipment_requirements']);
+    assert.deepEqual(missingForSubmission(blank.valid ? blank.values : {}, NOW), ['accessibility_needs', 'equipment_requirements']);
     const none = validateDraftInput({ ...COMPLETE, accessibility_needs: ' None ', equipment_requirements: 'none' });
     assert.equal(none.valid, true);
-    assert.deepEqual(missingForSubmission(none.valid ? none.values : {}), []);
+    assert.deepEqual(missingForSubmission(none.valid ? none.values : {}, NOW), []);
   });
 
   test('[BOUNDARY] [SG2-105:AC1] "No" is an answer to whether registration is needed, but no answer is missing', () => {
-    assert.deepEqual(missingForSubmission({ ...COMPLETE, registration_needed: false }), []);
-    assert.deepEqual(missingForSubmission({ ...COMPLETE, registration_needed: null }), ['registration_needed']);
+    assert.deepEqual(missingForSubmission({ ...COMPLETE, registration_needed: false }, NOW), []);
+    assert.deepEqual(missingForSubmission({ ...COMPLETE, registration_needed: null }, NOW), ['registration_needed']);
   });
 
   test('[NORMAL] [SG2-105:AC4] a draft keeps the preferred layout as trimmed text and may leave it out', () => {
@@ -46,7 +49,7 @@ describe('the customer minimum for submission (SG2-105)', () => {
       { valid: true, values: { ...emptyDraft(), preferred_layout: 'Banquet rounds of ten' } });
     const withoutLayout = validateDraftInput({ name: 'Partner Forum' });
     assert.deepEqual(withoutLayout, { valid: true, values: { ...emptyDraft(), name: 'Partner Forum' } });
-    assert.ok(missingForSubmission(withoutLayout.valid ? withoutLayout.values : {}).includes('preferred_layout'));
+    assert.ok(missingForSubmission(withoutLayout.valid ? withoutLayout.values : {}, NOW).includes('preferred_layout'));
   });
 
   test('[BOUNDARY] [SG2-105:AC1] the preferred layout takes up to 5000 characters, like the other requirements', () => {
@@ -74,7 +77,7 @@ describe('the event category (SG2-70)', () => {
     for (const body of [{}, { category: '' }, { category: null }]) {
       const result = validateDraftInput(body);
       assert.deepEqual(result, { valid: true, values: emptyDraft() });
-      assert.equal(missingForSubmission(result.valid ? result.values : {}).includes('category'), false);
+      assert.equal(missingForSubmission(result.valid ? result.values : {}, NOW).includes('category'), false);
     }
   });
 

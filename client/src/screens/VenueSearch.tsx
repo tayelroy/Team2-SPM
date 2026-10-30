@@ -212,6 +212,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                   {prefill ? (requesting === venue.venue_id
                     ? <VenueRequestForm accessToken={accessToken} eventId={prefill.eventId} venue={venue}
                         period={{ from: searched.from, until: searched.until }} layout={searched.layout}
+                        preferredLayout={prefill.preferredLayout}
                         venueRequirements={prefill.venueRequirements} onCancel={() => setRequesting(null)}
                         replacesBookingId={replacing?.booking_id}
                         changeReasonRequired={replacing !== null && replacing.affected_by.length === 0}

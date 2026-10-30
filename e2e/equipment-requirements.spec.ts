@@ -50,7 +50,7 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/equipment-requirements')).status()).toBe(204);
 });
 
-test('SG2-53-P01 | [NORMAL] [SG2-53:AC1] [SG2-53:AC2] [SG2-53:AC4] [SG2-53:AC5] [SG2-53:AC6] coordinator requests reach support and saved shortfall and placement return to the coordinator', async ({ page }) => {
+test('SG2-53-P01 | [NORMAL] [SG2-53:AC1] [SG2-53:AC2] [SG2-53:AC4] [SG2-53:AC5] [SG2-53:AC6] coordinator requests reach support, placement is limited to the event\'s venues, and saved shortfall and placement return to the coordinator', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -64,6 +64,13 @@ test('SG2-53-P01 | [NORMAL] [SG2-53:AC1] [SG2-53:AC2] [SG2-53:AC4] [SG2-53:AC5] 
   await signIn(page, 'support');
   await page.getByRole('button', { name: /Wireless microphones/ }).click();
   await page.getByRole('button', { name: 'Update arrangement for Wireless microphones', exact: true }).click();
+  // AC6: only the event's booked venue is offered, and another venue is refused server-side.
+  await expect(page.getByRole('combobox', { name: 'Placement venue', exact: true }).getByRole('option')).toHaveText(['Not recorded', 'Regression Hall']);
+  const elsewhere = await page.request.patch('/api/equipment-requests/1/arrangement', { headers: await auth(page),
+    data: { event_id: 53, version: 1, arrangement_notes: null, shortfall: 0, placement_venue_id: 2, placement_position: 'Quiet Room corner' } });
+  expect(elsewhere.status()).toBe(409);
+  expect(await elsewhere.json()).toEqual({ error: 'Choose a venue this event has requested or booked.' });
+  expect((await view(page)).requests).toEqual([empty]);
   await page.getByRole('textbox', { name: 'Arrangement notes', exact: true }).fill('Two units still need arranging.');
   await page.getByRole('textbox', { name: 'Shortfall quantity', exact: true }).fill('2');
   await page.getByRole('combobox', { name: 'Placement venue', exact: true }).selectOption('1');

@@ -13,6 +13,9 @@ import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
+/** The clock the handler judges proposed dates against (SG2-30 AC2), fixed so no result depends on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 const COMPLETE_BODY = {
   name: 'Partner Forum',
   purpose: 'Client relationship building',
@@ -62,6 +65,7 @@ function buildApp(options: HarnessOptions = {}) {
     createUpdateEventDraftHandler({
       getPrincipal: () => ('principal' in options ? options.principal : ORGANISER),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
+      now: () => NOW,
       fetchOwnRequest: async (_admin, eventId, organiserId) => {
         options.captureFetch?.(eventId, organiserId);
         return options.fetchResult ?? { ok: true, request: DRAFT_REQUEST };
@@ -128,6 +132,16 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     const response = await request(buildApp()).patch('/api/event-requests/7').send(withoutAccessibility);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, ['accessibility_needs']);
+  });
+
+  test('[NORMAL] [SG2-28:AC4] [SG2-30:AC2] a complete draft moved to a past date is still saved, but reports the date as outstanding', async () => {
+    let updated: unknown;
+    const response = await request(buildApp({ captureUpdate: (_id, _organiser, values) => (updated = values) }))
+      .patch('/api/event-requests/7')
+      .send({ ...COMPLETE_BODY, proposed_date: '2026-10-01T02:00:00.000Z' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(updated, { ...COMPLETE_BODY, proposed_date: '2026-10-01T02:00:00.000Z' });
+    assert.deepEqual(response.body.missingForSubmission, ['proposed_date_in_past']);
   });
 
   test('[NORMAL] [SG2-28:AC4] [SG2-29:AC1] reports what is still outstanding for an incomplete update', async () => {

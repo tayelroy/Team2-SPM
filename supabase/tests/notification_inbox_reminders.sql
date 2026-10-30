@@ -336,6 +336,27 @@ do $$ begin
  update public.equipment_requests set status='cancelled' where request_id=96901;
  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:cancelled-equipment-not-required] [SG2-69:AC5] [BOUNDARY] Cancelled equipment alone needs no reminder'; end if;
 end $$;
+-- SG2-57: equipment the organiser asked for but never requested (the only
+-- request was cancelled) is outstanding too; 'None' asks for none.
+savepoint asked_for_equipment;
+update public.events set equipment_requirements='Lapel microphones' where event_id=96901;
+update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
+do $$ declare before_count bigint; sent integer; begin
+ select count(*) into before_count from public.notifications where event_id=96901 and kind='outstanding_arrangements'
+  and message='Upcoming event Upcoming forum still needs: Equipment.';
+ sent:=public.send_outstanding_arrangement_reminders();
+ if sent is distinct from 1
+   or (select count(*) from public.notifications where event_id=96901 and kind='outstanding_arrangements'
+     and message='Upcoming event Upcoming forum still needs: Equipment.') is distinct from before_count+1 then
+  raise exception '[SG2-57:reminder-asked-for-equipment] [SG2-57:AC1] [SG2-69:AC5] [FAILURE] Equipment the organiser asked for that nobody requested must be in the reminder';
+ end if;
+ update public.events set equipment_requirements=' None ' where event_id=96901;
+ update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
+ if public.send_outstanding_arrangement_reminders() is distinct from 0 then
+  raise exception '[SG2-57:reminder-none-answer] [SG2-57:AC2] [SG2-69:AC5] [BOUNDARY] An event that answered None needs no equipment reminder';
+ end if;
+end $$;
+rollback to savepoint asked_for_equipment;
 insert into public.venue_unavailability(venue_id,starts_at,ends_at,reason,category)
  values(96901,clock_timestamp()+interval '100 days 1 hour',clock_timestamp()+interval '100 days 2 hours','Maintenance','maintenance');
 update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;

@@ -34,6 +34,8 @@ export interface UpdateEventDraftDependencies {
     organiserId: string,
     values: DraftValues
   ) => Promise<UpdateDraftResult>;
+  /** The clock a proposed date must be after to be submittable (SG2-30 AC2). */
+  now?: () => number;
 }
 
 /**
@@ -55,7 +57,8 @@ export function createUpdateEventDraftHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchOwnRequest = fetchManageableEventRequest,
-  updateDraft = updateEventRequestDraft
+  updateDraft = updateEventRequestDraft,
+  now = Date.now
 }: UpdateEventDraftDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -120,7 +123,7 @@ export function createUpdateEventDraftHandler({
 
     res.status(200).json({
       request: updated.request,
-      missingForSubmission: missingForSubmission(updated.request)
+      missingForSubmission: missingForSubmission(updated.request, now())
     });
   };
 }

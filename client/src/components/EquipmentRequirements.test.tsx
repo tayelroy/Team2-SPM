@@ -183,6 +183,24 @@ test.each([
   expect(screen.getByRole('alert')).toHaveTextContent('both placement fields or neither'); expect(saveEquipmentArrangement).not.toHaveBeenCalled();
   change('Shortfall quantity', '0'); change('Arrangement notes', ''); change('Placement venue', ''); change('Placement position', ''); submit('Update equipment arrangement'); await screen.findByText('Equipment arrangement saved.');
 });
+test('[NORMAL] [SG2-53:AC6] the placement venue choices are exactly the venues the event has requested or booked', async () => {
+  await open({ ...view, can_request: false, can_arrange: true, venues: [{ venue_id: 9, name: 'Main hall' }, { venue_id: 12, name: 'Annex' }] });
+  fireEvent.click(screen.getByRole('button', { name: 'Update arrangement for Microphone' }));
+  const choices = within(screen.getByLabelText('Placement venue')).getAllByRole('option');
+  expect(choices.map(option => [option.textContent, (option as HTMLOptionElement).value])).toEqual([['Not recorded', ''], ['Main hall', '9'], ['Annex', '12']]);
+  expect(screen.getByText(/Only venues this event has requested or booked can be chosen/)).toBeVisible();
+});
+test('[CONFLICT] [SG2-53:AC6] a saved placement at a venue the event no longer uses is shown but must be replaced before saving', async () => {
+  const stale = { ...arranged, placement_venue_id: 3, placement_venue_name: 'Rooftop Terrace' };
+  await arrangementForm(stale);
+  const venue = screen.getByLabelText('Placement venue');
+  expect(venue).toHaveValue('3');
+  expect(within(venue).getByRole('option', { name: 'Rooftop Terrace (not requested or booked for this event)' })).toBeDisabled();
+  submit('Update equipment arrangement');
+  expect(screen.getByRole('alert')).toHaveTextContent('using a venue this event has requested or booked'); expect(saveEquipmentArrangement).not.toHaveBeenCalled();
+  change('Placement venue', '9'); submit('Update equipment arrangement'); await screen.findByText('Equipment arrangement saved.');
+  expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { arrangement_notes: 'Two ready', shortfall: 2, placement_venue_id: 9, placement_position: 'Stage left' }, stale);
+});
 test.each([new EquipmentRequirementsError(503), new Error('Private transport error')])('[FAILURE] [SG2-53:AC1] load errors are safe and retry fetches the event again', async failure => {
   vi.mocked(loadEquipmentRequirements).mockRejectedValueOnce(failure); render(<EquipmentRequirements eventId={7} accessToken="token" />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading equipment requirements');

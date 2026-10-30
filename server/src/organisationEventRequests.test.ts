@@ -252,7 +252,9 @@ describe('SG2-26 organisation membership on writes', () => {
     const app = express();
     app.use(express.json());
     let writes = 0;
-    const deps = { getPrincipal: () => ({ userId: 'alice', role: 'event_organiser' as const }), getAdminClient: () => db.client };
+    // A fixed clock (SG2-30 AC2) so the event's 2026 date stays submittable whatever the real date.
+    const now = () => Date.parse('2026-10-29T03:00:00.000Z');
+    const deps = { getPrincipal: () => ({ userId: 'alice', role: 'event_organiser' as const }), getAdminClient: () => db.client, now };
     app.post('/events', createEventDraftHandler({ ...deps, insertDraft: async (_admin, draft) => {
       writes++;
       return { ok: true, request: { ...completeEvent, ...draft.values, organisation: draft.organisation } };

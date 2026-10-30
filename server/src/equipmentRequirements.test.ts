@@ -146,6 +146,13 @@ for (const [outcome, status, message] of [
   });
 }
 
+test('[CONFLICT] [SG2-53:AC6] a placement at a venue the event has not requested or booked is refused with guidance', async () => {
+  const { app, calls } = fixture('technical_support_staff', { outcome: 'venue' });
+  const response = await request(app).patch('/api/equipment-requests/11/arrangement').set(auth).send({ event_id: 7, version: 2, ...arranged });
+  assert.equal(response.status, 409); assert.deepEqual(response.body, { error: 'Choose a venue this event has requested or booked.' });
+  assert.deepEqual(calls, [['arrange', 7, 11, 2, arranged]]);
+});
+
 test('[FAILURE] [SG2-53:AC1] backend failures preserve public statuses and conceal private details', async () => {
   for (const error of [new AccessError(401), new AccessError(403), new AccessError(503), new Error('PRIVATE_DATABASE_DETAIL')]) {
     const { app } = fixture('event_coordinator', { outcome: 'ok', ...view }, error);

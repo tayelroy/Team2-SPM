@@ -47,7 +47,7 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
     const { arrangements } = computeArrangementReadiness({ event_id: eventId, status: String(event.status), latest_safety_decision: null,
       registration_needed: false, registration_capacity: null, registration_opens_at: null, registration_closes_at: null,
       venue_requests: facts.facts.venue_requests, affected_bookings: facts.facts.affected_bookings,
-      equipment_requests: facts.facts.equipment_requests });
+      equipment_requests: facts.facts.equipment_requests, equipment_requirements: (event.equipment_requirements ?? null) as string | null });
     return arrangements.every(arrangement => arrangement.key === 'safety' || arrangement.state !== 'outstanding');
   };
 

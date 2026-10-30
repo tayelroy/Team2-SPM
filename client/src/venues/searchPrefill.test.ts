@@ -17,7 +17,7 @@ test('[NORMAL] [SG2-46:AC1] AC1: an approved event pre-fills its whole Singapore
   expect(prefillFromEvent(event)).toEqual({
     eventId: 10, eventName: 'Meridian Capital Q4 Forum',
     accessibilityNeeds: 'Step-free access to the main room; a hearing loop in the hall.',
-    venueRequirements: 'A stage',
+    venueRequirements: 'A stage', preferredLayout: null,
     values: { ...EMPTY_SEARCH, from: '2026-10-12T00:00', until: '2026-10-12T23:59', attendance: '180', facilities: 'stage', accessibility: 'step-free, hearing loop' }
   });
 });
@@ -84,4 +84,20 @@ test('[BOUNDARY] [SG2-46:AC1] an event can pre-fill all twelve supported facilit
     'kitchen', 'bar', 'power outlets', 'air-conditioning', 'video conferencing'
   ]);
   expect(prefill.venueRequirements).toBe(requirement);
+});
+
+test('[NORMAL] [SG2-46:AC1] [SG2-48:AC1] an event preferring Theatre pre-fills the theatre layout, whatever its case or spacing', () => {
+  for (const preferred_layout of ['Theatre', '  theatre ', 'THEATRE']) {
+    const prefill = prefillFromEvent({ ...event, details: { ...event.details, preferred_layout } });
+    expect(prefill.values.layout).toBe('theatre');
+    expect(prefill.preferredLayout).toBe('theatre');
+  }
+});
+
+test('[BOUNDARY] [SG2-46:AC1] [SG2-48:AC1] a preferred layout naming no known layout leaves the search on any layout', () => {
+  for (const preferred_layout of ['Theatre-style with a stage', '', null]) {
+    const prefill = prefillFromEvent({ ...event, details: { ...event.details, preferred_layout } });
+    expect(prefill.values.layout).toBe('');
+    expect(prefill.preferredLayout).toBeNull();
+  }
 });

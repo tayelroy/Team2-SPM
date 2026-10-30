@@ -122,7 +122,8 @@ export function createGetEventArrangementsHandler({
       outstanding_arrangements: event.outstanding_arrangements,
       venue_requests: facts.facts.venue_requests,
       affected_bookings: facts.facts.affected_bookings,
-      equipment_requests: facts.facts.equipment_requests
+      equipment_requests: facts.facts.equipment_requests,
+      equipment_requirements: event.equipment_requirements
     });
 
     res.status(200).json(readiness);

@@ -49,7 +49,12 @@ now stands.
 - **Reject (AC4).** The event is shown as Safety Rejected and cannot move on to
   Preparation. Its assigned coordinator reworks it back to Planning ("Rework
   arrangements"), fixes the arrangements and resubmits them for a new check. The
-  status flow now allows `safety_rejected → planning`.
+  status flow now allows `safety_rejected → planning`. Rework also marks
+  `safety_other_recheck` outstanding (keeping any keys already there), so the
+  event stays in Planning and off the Safety Officer's list while it is fixed.
+  The coordinator resubmits it with "Mark other safety changes done"; it then
+  returns to Awaiting Safety Check (new revision) as soon as its venue and
+  equipment are in place.
 - **Request Changes.** The event returns to Planning, and the named arrangements go
   back to be confirmed again (SG2-93, below).
 
@@ -115,7 +120,7 @@ venue, equipment and registration work.
 | --- | --- | --- |
 | `POST /api/event-requests/:eventId/safety-decision` | Safety Officer | body `{ decision, reason?, arrangements?, safety_check_revision }`; 201 `{ decision, previous_status, status }`; 400 `Invalid safety decision` with `details`; 404; 409 `{ error, status }` when the check is closed; 409 `{ error, code: 'stale', revision }` when the event changed |
 | `GET /api/event-requests/:eventId/safety-decisions` | Safety Officer; the assigned coordinator; the organiser who created it | `{ decisions, rereviews }`, newest first (SG2-93 adds `rereviews`: `{ review_id, decision_id, arrangement, label, flagged_at, resolution, resolved_by_name, resolved_at }`); 404 for anyone else |
-| `POST /api/event-requests/:eventId/rework` | the assigned coordinator | 200 `{ event_id, status: 'planning' }`; 404; 409 unless Safety Rejected |
+| `POST /api/event-requests/:eventId/rework` | the assigned coordinator | 200 `{ event_id, status: 'planning' }`, with `safety_other_recheck` now outstanding until the coordinator settles it to resubmit; 404; 409 unless Safety Rejected |
 | `GET /api/safety-rereviews` (SG2-93) | Venue Staff (venue flags); Technical Support (equipment flags), by acting role | `{ arrangement, rereviews }`, open flags oldest first, each with the event, coordinator, the Safety Officer's reason and who decided, and the layout or placement |
 | `POST /api/safety-rereviews/:reviewId/confirm` (SG2-93) | the staff role the flag belongs to, acting as that role | 200 `{ review_id, event_id, status, outstanding_arrangements }`; 400 bad id; 403; 404; 409 already confirmed or withdrawn |
 | `POST /api/event-requests/:eventId/rechecks/:key/settle` (SG2-66) | the assigned coordinator | also takes the three `safety_*_recheck` keys; 409 with `blockers` while staff have not confirmed a flagged request again |

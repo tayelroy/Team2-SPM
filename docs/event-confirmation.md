@@ -33,8 +33,11 @@ Product-owner decisions (binding):
      (`withdraw_venue_booking_request()`; migration
      `202610150003_confirm_event_rejected_venues.sql` replaced the gate's
      venue check). A booking released under SG2-51 also cancels its request.
-   - **Equipment** — not required if there are no live `equipment_requests`;
-     otherwise outstanding if any live request lacks an
+   - **Equipment** — with no live `equipment_requests`, not required only if
+     the organiser asked for none (`equipment_requirements` not set or `None`,
+     `public.event_equipment_needed()`, SG2-57 migration
+     `202610290001_requested_equipment_outstanding.sql`); otherwise outstanding
+     until it is requested. With live requests, outstanding if any lacks an
      `equipment_reservations` receipt with its `request_id`, has no
      `placement_venue_id`, or has a `shortfall` other than 0.
    - **Registration** — not required unless `registration_needed` is true.

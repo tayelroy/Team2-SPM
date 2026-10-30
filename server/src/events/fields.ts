@@ -220,15 +220,33 @@ export function validateDraftInput(body: unknown): DraftValidation {
 }
 
 /**
- * Lists the submission-required fields still blank on a draft, so the client
- * can show what is outstanding without blocking the save (SG2-28: "fields
- * required for submission are identified").
+ * Outstanding item reported when the proposed date is set but no longer in
+ * the future (SG2-30 AC2). It sits in the same list as blank field names, so
+ * a draft with a past date still saves but is flagged as not ready, and
+ * submission refuses it the same way it refuses a blank field.
  */
-export function missingForSubmission(values: Partial<DraftValues>): DraftField[] {
-  return SUBMISSION_REQUIRED_FIELDS.filter((field) => {
+export const PROPOSED_DATE_IN_PAST = 'proposed_date_in_past';
+
+/** Shared with planning edits (SG2-39), which refuse a newly chosen past date. */
+export const PROPOSED_DATE_IN_FUTURE_MESSAGE = 'proposed_date must be in the future.';
+
+export type OutstandingItem = DraftField | typeof PROPOSED_DATE_IN_PAST;
+
+/**
+ * Lists what still stops a draft being submitted: the submission-required
+ * fields still blank, then PROPOSED_DATE_IN_PAST if the date is not after
+ * `now`. Shown to the client without blocking the save (SG2-28: "fields
+ * required for submission are identified") and enforced by submission.
+ */
+export function missingForSubmission(values: Partial<DraftValues>, now: number): OutstandingItem[] {
+  const outstanding: OutstandingItem[] = SUBMISSION_REQUIRED_FIELDS.filter((field) => {
     const value = values[field];
     return value === undefined || value === null || value === '';
   });
+  if (values.proposed_date && new Date(values.proposed_date).getTime() <= now) {
+    outstanding.push(PROPOSED_DATE_IN_PAST);
+  }
+  return outstanding;
 }
 
 /** Allowed event request statuses in the Supabase public.event_status enum. */

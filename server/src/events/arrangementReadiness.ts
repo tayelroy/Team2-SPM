@@ -11,16 +11,17 @@ import type { SafetyDecisionKind } from './safetyDecisions';
  * The items are the venue booking(s), any requested equipment, registration
  * and, since SG2-94, the operational safety check. Each is `ready`,
  * `outstanding`, or `not_required`. Venue and the safety check are always
- * required; equipment and registration are `not_required` when nothing is
- * requested or registration is not needed. SG2-94 AC6: registration settings
- * are the organiser's and never hold confirmation up; only a registration
- * recheck (SG2-66) does.
+ * required; registration is `not_required` when it is not needed, and
+ * equipment when the organiser asked for none and none was requested.
+ * SG2-94 AC6: registration settings are the organiser's and never hold
+ * confirmation up; only a registration recheck (SG2-66) does.
  *
  * `ready_for_confirmation` means every *required* item is ready. SG2-58's
  * `confirm_event` RPC applies the same rules in SQL as its gate, so the
  * panel and the Confirm action never disagree; any change here must be made
- * there too (latest: supabase/migrations/202610220001_safety_approval_gate.sql,
- * whose event_safety_approved() is mirrored by isSafetyApproved below).
+ * there too (latest: supabase/migrations/202610290001_requested_equipment_outstanding.sql,
+ * after 202610220001_safety_approval_gate.sql, whose event_safety_approved()
+ * is mirrored by isSafetyApproved below).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
@@ -47,6 +48,8 @@ export interface ArrangementReadinessInput {
   /** SG2-81 AC2: confirmed bookings a venue's unavailability affects. */
   affected_bookings?: number;
   equipment_requests: EquipmentRequestArrangementRow[];
+  /** The organiser's answer to "what equipment is needed"; see equipmentNeeded. */
+  equipment_requirements: string | null;
   /** Persisted SG2-39 impacts; absent/null values preserve legacy readiness. */
   arrangements_recheck_needed?: boolean | null;
   outstanding_arrangements?: string[] | null;
@@ -70,9 +73,28 @@ export interface ArrangementReadinessResult {
 // rejected requests (SG2-82, see computeVenue).
 const DEAD_STATUSES = new Set(['rejected', 'cancelled']);
 
-function isLive(row: { status: string }): boolean {
+export function isLive(row: { status: string }): boolean {
   return !DEAD_STATUSES.has(row.status.toLowerCase());
 }
+
+/** The request form's "No equipment needed" answer (SG2-105). */
+export const NO_EQUIPMENT_ANSWER = 'None';
+
+// NO_EQUIPMENT_ANSWER alone, any case, with ASCII whitespace either side. The
+// same pattern is public.event_equipment_needed()'s, so both agree exactly.
+const NO_EQUIPMENT_PATTERN = new RegExp(`^[ \\t\\n\\r\\f\\v]*${NO_EQUIPMENT_ANSWER}[ \\t\\n\\r\\f\\v]*$`, 'i');
+
+/**
+ * SG2-57: whether the organiser asked for equipment. Any answer except
+ * 'None' (trimmed, any case) or no answer at all is a need. Mirrors
+ * public.event_equipment_needed() (202610290001_requested_equipment_outstanding.sql).
+ */
+export function equipmentNeeded(requirements: string | null): boolean {
+  return requirements !== null && !NO_EQUIPMENT_PATTERN.test(requirements);
+}
+
+/** How much of the organiser's answer the equipment detail quotes. */
+const REQUIREMENTS_EXCERPT_LENGTH = 60;
 
 function pluralise(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -173,11 +195,24 @@ function computeVenue(requests: VenueBookingStatusRow[], affectedBookings: numbe
   };
 }
 
-function computeEquipment(requests: EquipmentRequestArrangementRow[]): ArrangementStatus {
+function computeEquipment(requests: EquipmentRequestArrangementRow[], requirements: string | null): ArrangementStatus {
   const live = requests.filter(isLive);
 
-  // Nothing requested means equipment is not needed for this event.
   if (live.length === 0) {
+    // SG2-57 (hosted QA): equipment the organiser asked for is outstanding
+    // until it has been requested, so the event cannot reach the safety
+    // check or be confirmed without it.
+    if (requirements !== null && equipmentNeeded(requirements)) {
+      // Quoted on one line and cut short; a blank answer is not quoted.
+      const quote = requirements.trim().replace(/\s+/g, ' ');
+      const shown = quote.length > REQUIREMENTS_EXCERPT_LENGTH ? `${quote.slice(0, REQUIREMENTS_EXCERPT_LENGTH - 1)}…` : quote;
+      return {
+        key: 'equipment',
+        label: 'Equipment',
+        state: 'outstanding',
+        detail: `The organiser asked for equipment${shown ? ` (${shown})` : ''} but none has been requested yet.`
+      };
+    }
     return {
       key: 'equipment',
       label: 'Equipment',
@@ -272,7 +307,7 @@ export function computeArrangementReadiness(
   const rechecks = input.arrangements_recheck_needed === true ? input.outstanding_arrangements ?? [] : [];
   const arrangements: ArrangementStatus[] = [
     computeVenue(input.venue_requests, input.affected_bookings ?? 0),
-    computeEquipment(input.equipment_requests),
+    computeEquipment(input.equipment_requests, input.equipment_requirements),
     computeRegistration(input)
   ].map((arrangement) => {
     // SG2-93: changes the Safety Officer asked for come first; staff must

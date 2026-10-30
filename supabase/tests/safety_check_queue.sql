@@ -467,4 +467,62 @@ begin
 end $$;
 reset role;
 
+-- SG2-57 (hosted QA, event #48): equipment the organiser asked for keeps the
+-- event in Planning until it is requested, even once every venue is booked.
+-- 'None' (the request form's "No equipment needed", trimmed, any case) or no
+-- answer asks for none. Changing the answer re-evaluates the hand-off.
+savepoint requested_equipment;
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,equipment_requirements,registration_needed)
+ select 99114+n,'d9100000-0000-4000-8000-000000000001','d9100000-0000-4000-8000-000000000002',
+  'Equipment event '||n,'planning',(array['Wireless microphones x 2','None',E' \tnone\n','Projector'])[n],false
+ from generate_series(1,4) n;
+select pg_temp.book(99114+n,99102,20+n) from generate_series(1,4) n;
+do $$
+begin
+ if (select status from public.events where event_id=99115) IS DISTINCT FROM 'planning'
+   or exists(select 1 from public.event_audit_logs where event_id=99115) then
+  raise exception '[SG2-57:asked-for-equipment-waits] [SG2-57:AC1] [SG2-91:AC1] [FAILURE] Booked venues must not hand over an event whose asked-for equipment was never requested';
+ end if;
+ if (select string_agg(status::text,',' order by event_id) from public.events where event_id in (99116,99117))
+   is distinct from 'awaiting_safety_check,awaiting_safety_check' then
+  raise exception '[SG2-57:none-answer-hands-off] [SG2-57:AC2] [SG2-91:AC1] [BOUNDARY] An event that answered None, in any case or padding, must still hand over once its venues are booked';
+ end if;
+end $$;
+-- A rejected request does not count as the equipment being requested.
+insert into public.equipment_requests(event_id,equipment_id,quantity,status) values (99118,99101,1,'rejected');
+-- The coordinator records that no equipment is needed after all, and the
+-- other event's answer changes from None to a real need.
+update public.events set equipment_requirements='None' where event_id=99115;
+update public.events set equipment_requirements='Lapel microphone' where event_id=99116;
+do $$
+begin
+ if (select status from public.events where event_id=99118) IS DISTINCT FROM 'planning' then
+  raise exception '[SG2-57:rejected-request-not-requested] [SG2-57:AC1] [BOUNDARY] A rejected equipment request must not stand in for the equipment the organiser asked for';
+ end if;
+ if (select status from public.events where event_id=99115) IS DISTINCT FROM 'awaiting_safety_check'
+   or (select count(*) from public.event_audit_logs where event_id=99115 and field_name='status'
+     and old_value='planning' and new_value='awaiting_safety_check') <> 1 then
+  raise exception '[SG2-57:none-edit-hands-off] [SG2-57:AC2] [SG2-91:AC1] [NORMAL] Changing the equipment answer to None must hand a ready event to the safety check at once, with one history row';
+ end if;
+ if (select status from public.events where event_id=99116) IS DISTINCT FROM 'planning' then
+  raise exception '[SG2-57:new-need-returns-to-planning] [SG2-57:AC1] [SG2-91:AC1] [CONFLICT] Asking for equipment while awaiting the check must return the event to Planning until it is requested';
+ end if;
+end $$;
+-- Requesting, placing and reserving the equipment completes the hand-off.
+do $$
+declare request bigint;
+begin
+ insert into public.equipment_requests(event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position)
+  values (99118,99101,1,'approved',0,99102,'Lectern') returning request_id into request;
+ if (select status from public.events where event_id=99118) IS DISTINCT FROM 'planning' then
+  raise exception '[SG2-57:requested-unreserved-waits] [SG2-57:AC1] [FAILURE] Requested but unreserved equipment must keep the event in Planning';
+ end if;
+ insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at)
+  values (99118,99101,1,'2031-11-25T09:00Z','2031-11-25T17:00Z',request,'2031-10-01T00:00Z');
+ if (select status from public.events where event_id=99118) IS DISTINCT FROM 'awaiting_safety_check' then
+  raise exception '[SG2-57:requested-equipment-hands-off] [SG2-57:AC1] [SG2-91:AC1] [NORMAL] Asked-for equipment requested, placed and reserved must hand the event to the safety check';
+ end if;
+end $$;
+rollback to savepoint requested_equipment;
+
 rollback;

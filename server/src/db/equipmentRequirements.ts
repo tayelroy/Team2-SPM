@@ -16,12 +16,13 @@ export interface RequirementsView {
   event: { event_id: number; name: string | null; status: string };
   requests: EquipmentRequirement[];
   equipment: { equipment_id: number; type: string }[];
+  /** The event's requested (pending or approved) or confirmed venues: the only placement choices (SG2-53 AC6). */
   venues: { venue_id: number; name: string }[];
   can_request: boolean; can_arrange: boolean;
 }
 export type RequirementsAction = 'read' | 'create' | 'amend' | 'arrange';
 export type RequirementsResult = ({ outcome: 'ok' } & RequirementsView)
-  | { outcome: 'missing' | 'closed' | 'conflict' | 'duplicate' | 'invalid' };
+  | { outcome: 'missing' | 'closed' | 'conflict' | 'duplicate' | 'invalid' | 'venue' };
 export interface EquipmentRequirementsStore {
   run(action: RequirementsAction, eventId: number, requestId?: number, version?: number,
     values?: RequirementValues | ArrangementValues): Promise<RequirementsResult>;
@@ -39,7 +40,7 @@ export function createEquipmentRequirementsStore(token: string, makeClient = cre
         p_version: version ?? null, p_values: values ?? null
       });
       if (error) throw new AccessError(status === 401 ? 401 : status === 403 || error.code === '42501' ? 403 : 503);
-      if (!data || !['ok', 'missing', 'closed', 'conflict', 'duplicate', 'invalid'].includes(data.outcome)) throw new AccessError(503);
+      if (!data || !['ok', 'missing', 'closed', 'conflict', 'duplicate', 'invalid', 'venue'].includes(data.outcome)) throw new AccessError(503);
       return data as RequirementsResult;
     }
   };

@@ -48,6 +48,27 @@ test('[NORMAL] [SG2-48:AC1] the request form starts from the searched period and
   });
 });
 
+const hall = { venue_id: 7, name: 'Hall A', layouts: [
+  { layout: 'classroom' as const, other_description: null }, { layout: 'theatre' as const, other_description: null }] };
+
+test('[NORMAL] [SG2-48:AC1] with the layout filter cleared, the request defaults to the event\'s preferred layout when the venue offers it', () => {
+  form({ venue: hall, layout: '', preferredLayout: 'theatre' });
+  expect(screen.getByLabelText('Required layout')).toHaveValue('theatre');
+});
+
+test('[NORMAL] [SG2-48:AC1] a layout the coordinator searched for wins over the event\'s preferred layout', () => {
+  form({ venue: hall, layout: 'classroom', preferredLayout: 'theatre' });
+  expect(screen.getByLabelText('Required layout')).toHaveValue('classroom');
+});
+
+test('[BOUNDARY] [SG2-48:AC1] without a preferred layout the venue offers, the request falls back to its first layout', () => {
+  form({ venue: hall, layout: '', preferredLayout: null });
+  expect(screen.getByLabelText('Required layout')).toHaveValue('classroom');
+  cleanup();
+  form({ venue: hall, layout: 'banquet', preferredLayout: 'boardroom' });
+  expect(screen.getByLabelText('Required layout')).toHaveValue('classroom');
+});
+
 test('[BOUNDARY] [SG2-48:AC1] a searched layout the venue does not offer falls back to its first, and the period must start before it ends', () => {
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);

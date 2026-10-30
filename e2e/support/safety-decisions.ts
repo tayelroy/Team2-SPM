@@ -70,7 +70,11 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
     const event = database.tables.events.find(row => row.event_id === eventId);
     if (!event || event.coordinator_id !== actorId) return { outcome: 'missing' };
     if (event.status !== 'safety_rejected') return { outcome: 'closed', status: String(event.status) };
-    event.status = 'planning';
+    // SG2-92 AC4: the event waits in Planning until the coordinator resubmits
+    // it by settling safety_other_recheck (202610290002).
+    const outstanding = (event.outstanding_arrangements ?? []) as string[];
+    Object.assign(event, { status: 'planning', arrangements_recheck_needed: true,
+      outstanding_arrangements: outstanding.includes('safety_other_recheck') ? outstanding : [...outstanding, 'safety_other_recheck'] });
     audit(eventId, actorId, 'status', 'safety_rejected', 'planning');
     return { outcome: 'ok', status: 'planning' };
   };

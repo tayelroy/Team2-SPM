@@ -55,6 +55,16 @@ const FIELD_LABELS: Record<SubmissionField, string> = {
   registration_needed: 'Whether registration is needed',
 };
 
+/**
+ * The server's outstanding item for a date that is no longer in the future
+ * (SG2-30 AC2). It arrives in the same list as blank field names.
+ */
+const PAST_DATE_ITEM = 'proposed_date_in_past';
+const PAST_DATE_MESSAGE = 'Date must be in the future';
+
+/** Labels for every outstanding item the server can list. */
+const OUTSTANDING_LABELS: Record<string, string> = { ...FIELD_LABELS, [PAST_DATE_ITEM]: PAST_DATE_MESSAGE };
+
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 type SaveState =
@@ -76,6 +86,8 @@ function FormField({
   onChange,
   hint,
   hasError,
+  errorText,
+  min,
   type = 'text',
 }: {
   label: string;
@@ -84,6 +96,9 @@ function FormField({
   onChange: (key: RequiredField, value: string) => void;
   hint?: string;
   hasError: boolean;
+  /** Replaces the default "… is required" message. */
+  errorText?: string;
+  min?: string;
   type?: 'text' | 'datetime-local';
 }) {
   const id = `rf-${fieldKey}`;
@@ -101,6 +116,7 @@ function FormField({
         id={id}
         type={type}
         value={value}
+        min={min}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(fieldKey, e.target.value)}
         aria-required="true"
         aria-invalid={hasError}
@@ -121,12 +137,20 @@ function FormField({
           role="alert"
           style={{ fontSize: '12px', color: '#ff8a80' }}
         >
-          {FIELD_LABELS[fieldKey]} is required
+          {errorText ?? `${FIELD_LABELS[fieldKey]} is required`}
         </span>
       )}
     </div>
   );
 }
+
+/**
+ * The answer the "None" button writes. For equipment requirements the server
+ * reads exactly this word (trimmed, any case) as "no equipment needed"
+ * (SG2-57; NO_EQUIPMENT_ANSWER in server/src/events/arrangementReadiness.ts);
+ * any other answer leaves the event's equipment outstanding until requested.
+ */
+const NONE_ANSWER = 'None';
 
 /**
  * A mandatory multi-line answer that may be "None" but not blank (SG2-105):
@@ -180,7 +204,7 @@ function NoneableTextField({
         }}
       />
       <div>
-        <Chip {...chipStyle(value.trim() === 'None')} onClick={() => onChange(fieldKey, 'None')}>
+        <Chip {...chipStyle(value.trim() === NONE_ANSWER)} onClick={() => onChange(fieldKey, NONE_ANSWER)}>
           {noneLabel}
         </Chip>
       </div>
@@ -228,7 +252,10 @@ function NoneableTextField({
  *
  * The date is a `datetime-local` input in Singapore time. The form keeps the
  * stored ISO instant and converts only for display, so an untouched date is
- * sent back exactly as it was loaded.
+ * sent back exactly as it was loaded. A date that is not in the future
+ * (SG2-30 AC2) is flagged on the field and keeps submit disabled, including
+ * on a reopened draft; it can still be saved, and the input's `min` offers
+ * only times from now on.
  *
  * Venue fit (SG2-47): once the request has a saved id, the organiser can check
  * how every venue fits the saved draft through the suitability API venue
@@ -301,12 +328,16 @@ export default function RequestForm({
 
   const emptyFields: SubmissionField[] = REQUIRED_FIELDS.filter((k) => !values[k].trim());
   if (registrationNeeded === null) emptyFields.push('registration_needed');
+  // SG2-30 AC2: a date that is no longer in the future is outstanding too,
+  // including on a draft reopened from My drafts.
+  const nowMs = Date.now();
+  const datePast = values.proposed_date !== '' && Date.parse(values.proposed_date) <= nowMs;
   const effectiveEventId = eventId ?? (createdEventId !== null ? String(createdEventId) : undefined);
 
   // When no real required-field data exists yet (fresh form), the submit
   // button is disabled. During an in-flight request it is also disabled.
   const isBusy = submitStatus === 'submitting' || saveState.kind === 'saving';
-  const isSubmitDisabled = emptyFields.length > 0 || isBusy;
+  const isSubmitDisabled = emptyFields.length > 0 || datePast || isBusy;
 
   function setField(key: RequiredField, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -389,14 +420,16 @@ export default function RequestForm({
     setSubmitStatus('error');
 
     if (result.kind === 'missing') {
-      const labels = result.missing
-        .map((f) => FIELD_LABELS[f as SubmissionField] ?? f)
-        .join(', ');
+      const blankFields = result.missing.filter((item) => item !== PAST_DATE_ITEM);
       setErrorMessage(
-        `Please complete the following required fields before submitting: ${labels}.`,
+        result.missing.length > 0 && blankFields.length === 0
+          ? `${PAST_DATE_MESSAGE} before this request can be submitted.`
+          : `Please complete the following required fields before submitting: ${result.missing
+              .map((item) => OUTSTANDING_LABELS[item] ?? item)
+              .join(', ')}.`,
       );
       // Mark those fields so inline errors appear.
-      setTouched(new Set(result.missing as SubmissionField[]));
+      setTouched(new Set(blankFields as SubmissionField[]));
     } else if (result.kind === 'conflict') {
       setErrorMessage(
         'This request has already been submitted and cannot be submitted again.',
@@ -519,7 +552,9 @@ export default function RequestForm({
             value={values.proposed_date ? isoToSgtLocal(values.proposed_date) : ''}
             onChange={(key, local) => setField(key, local ? sgtToIso(local) : '')}
             hint="Singapore time (SGT)"
-            hasError={touched.has('proposed_date') && !values.proposed_date.trim()}
+            hasError={(touched.has('proposed_date') && !values.proposed_date.trim()) || datePast}
+            errorText={datePast ? PAST_DATE_MESSAGE : undefined}
+            min={isoToSgtLocal(new Date(nowMs).toISOString())}
           />
           <FormField
             label="Expected attendance"
@@ -719,7 +754,7 @@ export default function RequestForm({
               ? saveState.missing.length === 0
                 ? `Draft ${saveState.reference} saved — ready to submit.`
                 : `Draft ${saveState.reference} saved. Still needed to submit: ${saveState.missing
-                    .map((field) => FIELD_LABELS[field as SubmissionField] ?? field)
+                    .map((item) => OUTSTANDING_LABELS[item] ?? item)
                     .join(', ')}.`
               : touched.size > 0 && emptyFields.length > 0
                 ? `${emptyFields.length} required field${emptyFields.length === 1 ? '' : 's'} still empty.`
