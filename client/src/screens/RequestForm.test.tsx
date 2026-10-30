@@ -24,7 +24,16 @@ import RequestForm from './RequestForm';
 
 const SESSION_KEY = 'connectsphere.session';
 
+// SG2-30 AC2 compares the proposed date with the current time, so every test
+// runs at a fixed instant instead of the real date: 22 Sep 2026, the same day
+// the browser suite pins. Fixture dates in October and November 2026 are
+// therefore in the future and the 1 Sep 2026 ones in the past, whenever the
+// suite runs.
+const NOW = new Date('2026-09-22T00:00:00.000Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   sessionStorage.setItem(
     SESSION_KEY,
@@ -37,6 +46,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   sessionStorage.clear();
 });
@@ -652,6 +662,58 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
     expect(screen.getByLabelText(/Date/i)).toHaveValue('');
     expect(screen.getByText('Date is required')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+  });
+
+  test('[FAILURE] [SG2-30:AC2] a draft reopened with a past date shows it as outstanding and blocks submission until the date moves forward', () => {
+    render(<RequestForm eventId="51" accessToken="test-token"
+      initialValues={{ ...STORED, proposed_date: '2026-09-01T02:00:00.000Z' }} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Date must be in the future');
+    expect(screen.getByLabelText(/Date/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-06-15T10:00' } });
+    expect(screen.queryByText('Date must be in the future')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+  });
+
+  test('[BOUNDARY] [SG2-30:AC2] a date one minute ahead can be submitted, the current minute cannot, and earlier times are not offered', () => {
+    vi.setSystemTime(new Date('2026-10-29T03:00:00.000Z'));
+    render(<RequestForm eventId="1" accessToken="test-token"
+      initialValues={{ ...STORED, proposed_date: '2026-10-29T03:01:00.000Z' }} />);
+    const date = screen.getByLabelText(/Date/i);
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+    // The picker's earliest choice is now, in Singapore time.
+    expect(date).toHaveAttribute('min', '2026-10-29T11:00');
+
+    fireEvent.change(date, { target: { value: '2026-10-29T11:00' } });
+    expect(screen.getByText('Date must be in the future')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+  });
+
+  test('[FAILURE] [SG2-30:AC2] saving a past-dated draft keeps it, but says the date is still needed to submit', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(draftResponse(['proposed_date_in_past'], 51)));
+    render(<RequestForm eventId="51" accessToken="test-token"
+      initialValues={{ ...STORED, proposed_date: '2026-09-01T02:00:00.000Z' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(await screen.findByText('Draft 51 saved. Still needed to submit: Date must be in the future.')).toBeInTheDocument();
+    expect(screen.queryByText(/ready to submit/)).not.toBeInTheDocument();
+  });
+
+  test('[FAILURE] [SG2-30:AC2] a submission the server refuses for its date says so instead of reporting success', async () => {
+    const onSuccess = vi.fn();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(draftResponse([], 1))
+      .mockResolvedValueOnce(Response.json(
+        { error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past'] }, { status: 400 })));
+    renderStored(onSuccess);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+
+    expect(await screen.findByText('Date must be in the future before this request can be submitted.')).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
   test('[NORMAL] [SG2-29:AC2] a reopened draft shows no requirement chips or canned suitability banner it never stored', () => {

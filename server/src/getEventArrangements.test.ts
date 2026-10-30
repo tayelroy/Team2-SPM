@@ -107,12 +107,27 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
             equipment_requests: []
           }
         },
-        planning: { ok: true, event: { ...MOCK_EVENT, registration_needed: false } }
+        planning: { ok: true, event: { ...MOCK_EVENT, registration_needed: false, equipment_requirements: 'None' } }
       })
     ).get('/api/event-requests/101/arrangements');
 
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.outstanding, ['venue']);
+    assert.equal(res.body.ready_for_confirmation, false);
+  });
+
+  test('[CONFLICT] [SG2-57:AC1] [SG2-57:AC2] equipment the organiser asked for is outstanding while none has been requested', async () => {
+    const res = await request(
+      buildApp({
+        facts: { ok: true, facts: { venue_requests: [{ status: 'approved', booked: true }], equipment_requests: [] } },
+        planning: { ok: true, event: { ...MOCK_EVENT, registration_needed: false, equipment_requirements: 'Projector' } }
+      })
+    ).get('/api/event-requests/101/arrangements');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.outstanding, ['equipment']);
+    assert.deepEqual(res.body.arrangements[1], { key: 'equipment', label: 'Equipment', state: 'outstanding',
+      detail: 'The organiser asked for equipment (Projector) but none has been requested yet.' });
     assert.equal(res.body.ready_for_confirmation, false);
   });
 

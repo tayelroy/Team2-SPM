@@ -543,6 +543,36 @@
     "method_id": "SG2-28:an-empty-draft-saves-once-but-cannot-be-submitted"
   },
   {
+    "id": "SG2-30-N01",
+    "title": "A complete request dated in the past is saved as a draft but cannot be submitted until its date moves forward",
+    "type": "Negative",
+    "story": "SG2-30",
+    "purpose": "Verify AC2 for a date that has already passed (hosted QA 29 Oct 2026: a request dated 1 Oct 2026 was submitted and reached the Lead's queue). The form and the server must both refuse it, list the date as outstanding and keep the request a draft; moving the date forward clears it.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as the organiser, open New request and fill every field with date 1 Sep 2026 10:00 SGT.",
+      "Check the date error and Submit request, then Save draft.",
+      "Submit the saved draft through the fixture API and read its status.",
+      "Change the date to 15 Jun 2030 17:00 SGT and submit from the form."
+    ],
+    "data": "Past forum; every required answer; proposed date 2026-09-01T02:00:00.000Z (past for the pinned browser clock, 22 Sep 2026, and for the server), then 2030-06-15T09:00:00.000Z",
+    "expected": "The form shows 'Date must be in the future' and Submit request is disabled; the save reports 'Draft N saved. Still needed to submit: Date must be in the future.'; the API submission returns 400 {error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past']} and the request stays a draft; after moving the date the error clears, the request is submitted and its status is unassigned.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally on the PR #125 branch; fails on main (no date error, submission accepted).",
+    "execution_evidence": "30 Oct 2026; PR #125 branch on main 864c92e; local production build, Playwright Chromium, e2e/regression.spec.ts -g SG2-30-N01: passed.",
+    "execution_date": "30 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC2",
+      "SG2-28:AC4"
+    ]
+  },
+  {
     "id": "SG2-29-P01",
     "title": "editing then submitting preserves the latest field values",
     "type": "Positive",
@@ -3184,6 +3214,36 @@
     ]
   },
   {
+    "id": "SG2-48-P03",
+    "title": "The event's preferred layout pre-fills the search and the request, even when the venue lists another layout first",
+    "type": "Positive",
+    "story": "SG2-48",
+    "purpose": "Verify AC1 (the request carries the event's required layout) for hosted QA 29 Oct 2026, where a Theatre event was booked into E2E16-VN Hall A as Classroom, that venue's first layout. The venue here lists Classroom before Theatre, so a Theatre default can only come from the event.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Venue Staff set Regression Hall's layouts to classroom then theatre through the API.",
+    "steps": [
+      "Seed the venue request fixture; as Venue Staff, set Regression Hall's layouts to classroom and theatre.",
+      "Sign in as coordinator and open venue search from Venue Request Forum; read the Layout filter.",
+      "Set Layout to Any layout and search again; open Request this venue on Regression Hall and read Required layout.",
+      "Send the request for 09:00–12:00 on 20 June 2030 and read the event's venue requests through the API."
+    ],
+    "data": "Event 91 (preferred layout Theatre, 80 guests); Regression Hall (venue 1, layouts classroom then theatre)",
+    "expected": "Layout is pre-filled with theatre and one venue is listed; with the filter cleared, Required layout still defaults to theatre; the stored request for event 91 is venue 1 with layout theatre.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally on the PR #125 branch; fails on main (Layout filter empty).",
+    "execution_evidence": "30 Oct 2026; PR #125 branch on main 864c92e; local production build, Playwright Chromium, e2e/regression.spec.ts -g SG2-48-P03: passed.",
+    "execution_date": "30 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC1",
+      "SG2-46:AC1"
+    ]
+  },
+  {
     "id": "SG2-48-P02",
     "title": "One event requests several different venues, each pending on its own",
     "type": "Positive",
@@ -3192,10 +3252,10 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
-      "Clear the attendance and search again so both venues are listed.",
+      "Check Layout is pre-filled with Theatre from the event's preferred layout, then clear the attendance, set Layout to Any layout and search again so both venues are listed.",
       "Request Regression Hall, then Quiet Room, for 09:00\u201312:00 on 20 June 2030."
     ],
-    "data": "Event 91; Regression Hall (theatre) and Quiet Room (boardroom)",
+    "data": "Event 91 (preferred layout Theatre); Regression Hall (theatre) and Quiet Room (boardroom)",
     "expected": "Both requests are accepted and the event's venue requests list both venues as Pending, Quiet Room with its Boardroom layout.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -4003,16 +4063,16 @@
   },
   {
     "id": "SG2-53-P01",
-    "title": "coordinator requests reach support and saved shortfall and placement return to the coordinator",
+    "title": "coordinator requests reach support, placement is limited to the event's venues, and saved shortfall and placement return to the coordinator",
     "type": "NORMAL",
     "story": "SG2-53",
-    "purpose": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "purpose": "Exact stored versions 1/2/3, all fields persisted, placement offered and accepted only at the event's own venue, stock remains 20/version 1 and amendment resets arrangement fields.",
     "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
     "steps": [
-      "Create four microphone requirements at 1440px, reload, arrange a shortfall of two with venue/position as support, read as Safety Officer and coordinator, then amend to six."
+      "Create four microphone requirements at 1440px, reload, open the arrangement as support and check the Placement venue choices, attempt a placement at Quiet Room through the API, arrange a shortfall of two with venue/position, read as Safety Officer and coordinator, then amend to six."
     ],
-    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
-    "expected": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "data": "Event 53 with a confirmed booking at venue 1 Regression Hall; venue 2 Quiet Room is not the event's venue; equipment 1 microphones (20 units), equipment 2 projector under maintenance; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Placement venue lists only Not recorded and Regression Hall; the Quiet Room placement returns 409 'Choose a venue this event has requested or booked.' and leaves version 1 unchanged; exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
     "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -4026,9 +4086,9 @@
       "SG2-53:AC6"
     ],
     "status": "Pass",
-    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
-    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
-    "execution_date": "8 Oct 2026",
+    "actual": "Passed in the SG2-53 placement-venue Chromium run (equipment-requirements, equipment-reservations, equipment-availability and week7-journey specs); only the event's venue was offered, the other venue was refused with 409, and exact persisted fields and visible outcomes were checked.",
+    "execution_evidence": "29 Oct 2026; bugfix/SG2-53-placement-event-venues; isolated Playwright Chromium against the in-memory fixture. Hosted results are recorded in the PR.",
+    "execution_date": "29 Oct 2026",
     "executed_by": "Automated test runner",
     "review": {
       "date": "2026-10-08",
@@ -7387,7 +7447,7 @@
   },
   {
     "id": "SG2-92-P02",
-    "title": "The coordinator sees the rejection and its reason, and reworks the event back to Planning",
+    "title": "The coordinator sees the rejection and its reason, reworks the event back to Planning and resubmits it for a new check",
     "type": "NORMAL",
     "story": "SG2-92",
     "categories": [
@@ -7401,10 +7461,11 @@
     "preconditions": "Same fixture as SG2-92-P01; Riverside Fair rejected through the API by the Safety Officer at safety_check_revision 1.",
     "steps": [
       "Sign in as coordinator at 390px and open Riverside Fair from My assigned events.",
-      "Read the latest safety decision, then choose Rework arrangements."
+      "Read the latest safety decision, then choose Rework arrangements.",
+      "Choose Mark other safety changes done to resubmit the reworked event."
     ],
     "data": "Event 922; reason 'Crowd flow blocks the east fire exit'.",
-    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning, removes the button, and the history has awaiting_safety_check\u2192safety_rejected then safety_rejected\u2192planning.",
+    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning with safety_other_recheck outstanding and removes the button; marking other safety changes done returns it to awaiting_safety_check with a new revision, and the history has awaiting_safety_check\u2192safety_rejected, safety_rejected\u2192planning, then planning\u2192awaiting_safety_check.",
     "evidence": "e2e/safety-decisions.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -9300,6 +9361,41 @@
     "executed_by": "Claude (automated local verification)",
     "relatedCases": [
       "SG2-96-INT01"
+    ],
+    "review": null
+  },
+  {
+    "id": "SG2-57-N01",
+    "title": "Equipment the organiser asked for stays outstanding until requested, so approving the venue first does not hand the event to the safety check",
+    "type": "CONFLICT",
+    "story": "SG2-57",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-57:AC1",
+      "SG2-57:AC2",
+      "SG2-94:AC4"
+    ],
+    "purpose": "Hosted QA 29 Oct 2026 (event #48): an event whose organiser asked for wireless microphones reached the safety check as soon as its venue was approved, because no equipment request existed and equipment counted as not required. Verify the organiser's equipment answer keeps equipment outstanding until it is requested, reserved and placed.",
+    "preconditions": "Production React build and real Express handlers on loopback; in-memory fixture reset, the safety-check hand-off turned on (/__e2e/safety-handoff) and a theatre layout recorded for Regression Hall; one browser page at 1440x1000.",
+    "steps": [
+      "Organiser submits 'Week 7 journey' asking for 'Two wireless microphones'; Lead assigns Regression coordinator; coordinator approves it.",
+      "Coordinator requests Regression Hall for the event's two hours; Venue Staff approve it before any equipment is requested.",
+      "Coordinator opens the event and reads the arrangements panel.",
+      "Coordinator adds 2 wireless microphones; Technical Support place and reserve them."
+    ],
+    "data": "Event 'Week 7 journey' (40 people, theatre, equipment 'Two wireless microphones'); Regression Hall; Wireless microphones; fixture accounts organiser, lead, coordinator, support, venue.",
+    "expected": "After the venue approval the event stays approved; Venue is Ready and Equipment is Outstanding with 'The organiser asked for equipment (Two wireless microphones) but none has been requested yet.'; adding the request keeps it approved; once reserved and placed it moves to awaiting_safety_check by itself; status history unassigned, submitted, under_review, approved, awaiting_safety_check; no page errors.",
+    "evidence": "e2e/week7-journey.spec.ts; e2e/support/safety-handoff.ts; supabase/migrations/202610290001_requested_equipment_outstanding.sql",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally; the same case fails against main (event reached awaiting_safety_check after the venue approval).",
+    "execution_evidence": "29 Oct 2026; bugfix/SG2-57-requested-equipment-outstanding working tree on main 046a6e0; local production build, Playwright Chromium, e2e/week7-journey.spec.ts: 2 passed.",
+    "execution_date": "29 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "relatedCases": [
+      "SG2-96-E2E01"
     ],
     "review": null
   },

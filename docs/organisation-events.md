@@ -36,6 +36,19 @@ cached browser value cannot select the organisation to read.
   `2030-06-15T02:00:00.000Z` shows as `15 Jun 2030, 10:00` and is sent back
   unchanged when untouched. An edited value is converted from Singapore time
   (`07:30` on 15 June is saved as `2030-06-14T23:30:00.000Z`).
+- **A past date is outstanding (SG2-30 AC2).** A draft still saves with a
+  date that is not in the future (SG2-28 AC4), but `missingForSubmission`
+  then lists the item `proposed_date_in_past`, after any blank fields, and
+  the save message reads "Still needed to submit: Date must be in the
+  future." The form flags the date with the same words and keeps **Submit
+  request** disabled, including on a draft reopened from **My drafts**; the
+  date input's `min` is the current Singapore time. `PATCH …/submit` checks
+  the same rule against the server clock: a date at or before now is
+  refused with 400 and `missing: ['proposed_date_in_past']` (error
+  `proposed_date must be in the future.` when it is the only item, the usual
+  `Event request is missing required fields.` otherwise), and the request
+  keeps its status with no history row or notice. A date one minute ahead
+  is accepted.
 - The form shows only what a request stores. The earlier prototype
   requirement chips (Step-free access, Hearing loop, Stage + lectern, …) were
   never sent to the server, so they silently discarded input and were removed;

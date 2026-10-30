@@ -29,8 +29,8 @@ test('[NORMAL] [SG2-53:AC1] [SG2-53:AC2] [SG2-53:AC4] all operations use one RPC
     ['manage_equipment_requirements', { p_action: 'arrange', p_event_id: 7, p_request_id: 11, p_version: 4, p_values: arrangement }]
   ]);
 });
-test('[CONFLICT] [SG2-53:AC2] [SG2-53:AC3] database refusals are preserved without inventing successful writes', async () => {
-  for (const outcome of ['missing', 'closed', 'conflict', 'duplicate', 'invalid'] as const) {
+test('[CONFLICT] [SG2-53:AC2] [SG2-53:AC3] [SG2-53:AC6] database refusals are preserved without inventing successful writes', async () => {
+  for (const outcome of ['missing', 'closed', 'conflict', 'duplicate', 'invalid', 'venue'] as const) {
     const result: RequirementsResult = { outcome };
     assert.deepEqual(await createEquipmentRequirementsStore('token', () => client({ data: result, error: null, status: 200 })).run('amend', 7, 11, 1), result);
   }

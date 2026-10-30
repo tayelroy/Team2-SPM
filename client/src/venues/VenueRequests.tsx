@@ -55,6 +55,8 @@ interface RequestFormProps {
   /** The searched period, `YYYY-MM-DDTHH:mm` in Singapore time. */
   period: { from: string; until: string };
   layout: Layout | '';
+  /** SG2-48 AC1: the event's preferred layout, used when the searched one is not offered. */
+  preferredLayout?: Layout | null;
   venueRequirements: string | null;
   /** SG2-81 AC4: the affected booking this request replaces, if it does.
    * SG2-83 AC1: or the current booking it changes. */
@@ -77,8 +79,10 @@ export function VenueRequestForm(props: RequestFormProps) {
       <GhostButton onClick={props.onCancel} style={{ justifySelf: 'start' }}>Close</GhostButton>
     </div>;
   }
-  // The searched layout when the venue offers it, otherwise its first.
-  return <RequestFields {...props} layout={props.layout && offered.includes(props.layout) ? props.layout : offered[0]} />;
+  // The searched layout when the venue offers it, else the event's preferred
+  // layout when offered, otherwise the venue's first.
+  const layout = [props.layout, props.preferredLayout].find((wanted): wanted is Layout => !!wanted && offered.includes(wanted)) ?? offered[0];
+  return <RequestFields {...props} layout={layout} />;
 }
 
 function RequestFields({ accessToken, eventId, venue, period, layout, venueRequirements, replacesBookingId, changeReasonRequired = false,

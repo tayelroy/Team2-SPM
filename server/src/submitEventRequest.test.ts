@@ -15,6 +15,9 @@ import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
+/** The clock submission judges proposed dates against (SG2-30 AC2), fixed so no result depends on the real date. */
+const NOW = Date.parse('2026-10-29T03:00:00.000Z');
+
 const COMPLETE_DRAFT = {
   event_id: 7,
   organiser_id: 'user-1',
@@ -43,6 +46,7 @@ interface HarnessOptions {
   historyResult?: InsertAuditLogsResult;
   leadsResult?: FetchLeadIdsResult;
   notifyResult?: NotifyEventResult;
+  now?: number;
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -75,7 +79,8 @@ function buildApp(options: HarnessOptions = {}) {
       notify: async (_admin, batch) => {
         notices.push(batch);
         return options.notifyResult ?? { ok: true };
-      }
+      },
+      now: () => options.now ?? NOW
     })
   );
   return Object.assign(app, { history, notices, leadReads });
@@ -330,6 +335,50 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
     assert.deepEqual(app.history, []);
     assert.deepEqual(app.notices, []);
+  });
+
+  test('[FAILURE] [SG2-30:AC2] a complete draft dated in the past is refused, listing the date as outstanding, and stays a draft', async () => {
+    let writes = 0;
+    const app = buildApp({
+      now: NOW,
+      captureSubmit: () => { writes++; },
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-01T02:00:00.000Z' } }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'proposed_date must be in the future.', missing: ['proposed_date_in_past'] });
+    // No status write, history row or notice: it never reaches the Lead's queue.
+    assert.equal(writes, 0);
+    assert.deepEqual(app.history, []);
+    assert.deepEqual(app.notices, []);
+  });
+
+  test('[FAILURE] [SG2-30:AC2] [SG2-36:AC2] a past date is listed alongside blank fields, and a rejected request with one is not resubmitted', async () => {
+    let writes = 0;
+    const response = await request(buildApp({
+      now: NOW,
+      captureSubmit: () => { writes++; },
+      fetchResult: { ok: true, request: {
+        ...COMPLETE_DRAFT, status: 'rejected', name: null, proposed_date: '2026-10-01T02:00:00.000Z'
+      } }
+    })).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['name', 'proposed_date_in_past'] });
+    assert.equal(writes, 0);
+  });
+
+  test('[BOUNDARY] [SG2-30:AC2] a date at the current instant is refused, one millisecond later is submitted', async () => {
+    const atNow = await request(buildApp({
+      now: NOW, fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:00:00.000Z' } }
+    })).patch('/api/event-requests/7/submit');
+    assert.deepEqual([atNow.status, atNow.body.missing], [400, ['proposed_date_in_past']]);
+    let submitted: number | undefined;
+    const oneMillisecondLater = await request(buildApp({
+      now: NOW, captureSubmit: eventId => (submitted = eventId),
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, proposed_date: '2026-10-29T03:00:00.001Z' } }
+    })).patch('/api/event-requests/7/submit');
+    assert.equal(oneMillisecondLater.status, 200);
+    assert.equal(submitted, 7);
   });
 
   test('[BOUNDARY] [SG2-105:AC1] a request saying registration is not needed has answered the question and can be submitted', async () => {

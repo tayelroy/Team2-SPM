@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import App from './App';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
@@ -15,6 +15,12 @@ afterEach(() => {
   sessionStorage.clear();
   vi.useRealTimers();
 });
+
+/** SG2-30 AC2 compares proposed dates with the current time; request-form tests run at this fixed instant (the browser suite's 22 Sep 2026), so their October 2026 dates stay in the future whenever they run. */
+function fixClock() {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-22T00:00:00.000Z'));
+}
 
 // jsdom has no canvas implementation; the orb hook is written to no-op when
 // there is no 2D context, and stubbing this keeps the console clean.
@@ -505,6 +511,7 @@ test('[NORMAL] [SG2-41:AC4] the signed-in coordinator opens the actual selected 
 });
 
 describe('the events table', () => {
+  beforeEach(fixClock);
   test('[FAILURE] [SG2-26:AC2] a coordinator is not offered the organisation event list or detail, and the list still refuses them', async () => {
     await signInAs('Event Coordinator');
     const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -612,6 +619,7 @@ describe('the event detail action panel', () => {
 });
 
 describe('the request form', () => {
+  beforeEach(fixClock);
   const openForm = async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
@@ -774,6 +782,7 @@ describe('the request form', () => {
 });
 
 describe('editing a draft (SG2-29)', () => {
+  beforeEach(fixClock);
   test('[NORMAL] [SG2-29:AC2] [SG2-30:AC1] Edit opens the form pre-filled, and a successful submit confirms the named event on its detail page', async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'My drafts' }));

@@ -3,6 +3,15 @@ import type { ArrangementValues, EquipmentRequirement, EquipmentRequirementsStor
 import type { MemoryDatabase } from './memory-database';
 import { refreshSafetyCheckStatus } from './safety-handoff';
 
+/** SG2-53 AC6, as in manage_equipment_requirements: the venues an event has a
+ * pending or approved request for, or a confirmed booking at. */
+function eventVenueIds(database: MemoryDatabase, eventId: number): Set<number> {
+  return new Set([
+    ...database.tables.venue_booking_requests.filter(row => row.event_id === eventId && ['pending', 'approved'].includes(String(row.status))),
+    ...database.tables.venue_bookings.filter(row => row.event_id === eventId && row.status === 'confirmed'),
+  ].map(row => Number(row.venue_id)));
+}
+
 /** Browser storage fixture only. PostgreSQL policy/race suites separately
  * verify the actual guarded RPC, locks and constraints. */
 export function createMemoryRequirementsStore(database: MemoryDatabase, token: string): EquipmentRequirementsStore {
@@ -31,6 +40,7 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
           if (arrangement.shortfall > Number(record!.quantity)
             || (record!.status === 'approved' && arrangement.shortfall !== 0)) return { outcome: 'invalid' };
           if (arrangement.placement_venue_id !== null && !database.tables.venues.some(venue => venue.venue_id === arrangement.placement_venue_id)) return { outcome: 'invalid' };
+          if (arrangement.placement_venue_id !== null && !eventVenueIds(database, eventId).has(arrangement.placement_venue_id)) return { outcome: 'venue' };
           Object.assign(record!, arrangement, { version: Number(record!.version) + 1 });
         } else {
           const requirement = values as RequirementValues;
@@ -59,7 +69,9 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
       const view: RequirementsView = {
         event: { event_id: eventId, name: event.name as string | null, status: String(event.status) }, requests,
         equipment: database.tables.equipment.map(row => ({ equipment_id: Number(row.equipment_id), type: String(row.name) })),
-        venues: database.tables.venues.map(row => ({ venue_id: Number(row.venue_id), name: String(row.name) })),
+        venues: database.tables.venues.filter(row => eventVenueIds(database, eventId).has(Number(row.venue_id)))
+          .sort((left, right) => Number(left.venue_id) - Number(right.venue_id))
+          .map(row => ({ venue_id: Number(row.venue_id), name: String(row.name) })),
         can_request: coordinator && editable, can_arrange: support && editable,
       };
       return { outcome: 'ok', ...view };

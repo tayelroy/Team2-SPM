@@ -23,7 +23,20 @@ insert into public.events(event_id,organiser_id,coordinator_id,name,status,propo
  (95303,'d5300000-0000-4000-8000-000000000005','d5300000-0000-4000-8000-000000000001','Draft forum','draft',null);
 insert into public.equipment(equipment_id,name,quantity_total,operational_status) values
  (95301,'Microphones',5,'operational'),(95302,'Projectors',0,'maintenance'),(95303,'Speakers',20,'operational');
-insert into public.venues(venue_id,name) values (95301,'Forum hall');
+insert into public.venues(venue_id,name) values (95301,'Forum hall'),(95302,'Pending annex'),
+ (95303,'Booked terrace'),(95304,'Released room');
+-- AC6 placement venues. Event 95301 has a pending request for 95301. Event
+-- 95302 has a pending request for 95302 and a confirmed booking for 95303;
+-- its request for 95304 was rejected, another cancelled, and its 95304
+-- booking released. Neither event uses the other's venues.
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
+ (95301,95301,'2030-10-01T09:00Z','2030-10-01T12:00Z','pending'),
+ (95302,95302,'2030-11-01T09:00Z','2030-11-01T12:00Z','pending'),
+ (95302,95304,'2030-11-01T09:00Z','2030-11-01T12:00Z','rejected'),
+ (95302,95304,'2030-11-01T13:00Z','2030-11-01T15:00Z','cancelled');
+insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status,cancelled_at,cancellation_reason) values
+ (95303,95302,'2030-11-01T09:00Z','2030-11-01T12:00Z','confirmed',null,null),
+ (95304,95302,'2030-11-01T16:00Z','2030-11-01T18:00Z','cancelled','2030-09-01T00:00Z','Released');
 -- Model a pre-SG2-53 request: long free-text notes and its original period.
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,notes,starts_at,ends_at)
  values (95399,95302,95303,2,repeat('L',2001),'2030-11-01T09:00Z','2030-11-01T12:00Z');
@@ -159,6 +172,41 @@ begin
   raise exception '[SG2-53:queue-arrangement-details] [SG2-53:AC4] [SG2-53:AC5] [SG2-53:AC6] [NORMAL] The support queue must retain saved arrangement, shortfall and named placement per item';
  end if;
 end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5300000-0000-4000-8000-000000000003',true);
+do $$
+declare result jsonb; venue integer;
+begin
+ if public.manage_equipment_requirements('read',95302)->'venues' is distinct from
+   '[{"venue_id":95302,"name":"Pending annex"},{"venue_id":95303,"name":"Booked terrace"}]'::jsonb
+   or public.manage_equipment_requirements('read',95301)->'venues' is distinct from
+   '[{"venue_id":95301,"name":"Forum hall"}]'::jsonb then
+  raise exception '[SG2-53:placement-venue-choices] [SG2-53:AC6] [NORMAL] Placement choices must list only venues the event has requested or booked, never the whole catalogue';
+ end if;
+ foreach venue in array array[95301,95304] loop
+  if public.manage_equipment_requirements('arrange',95302,95399,2,
+    jsonb_build_object('shortfall',0,'placement_venue_id',venue,'placement_position','Stage'))->>'outcome' is distinct from 'venue' then
+   raise exception '[SG2-53:placement-unrelated-venue-refused] [SG2-53:AC6] [FAILURE] A placement at another event''s venue or a rejected, cancelled or released one must be refused: %',venue;
+  end if;
+ end loop;
+ if (public.manage_equipment_requirements('read',95302)->'requests' @>
+   '[{"request_id":95399,"shortfall":1,"placement_venue_id":null,"placement_position":null,"version":2}]'::jsonb) is not true then
+  raise exception '[SG2-53:placement-refusal-unchanged] [SG2-53:AC6] [FAILURE] A refused placement must leave the arrangement and its version unchanged';
+ end if;
+ result := public.manage_equipment_requirements('arrange',95302,95399,2,
+  '{"shortfall":0,"placement_venue_id":95302,"placement_position":"Annex stage"}');
+ if result->>'outcome' is distinct from 'ok' or (result->'requests' @>
+   '[{"request_id":95399,"placement_venue_id":95302,"placement_venue_name":"Pending annex","placement_position":"Annex stage","version":3}]'::jsonb) is not true then
+  raise exception '[SG2-53:placement-pending-request-venue] [SG2-53:AC6] [NORMAL] Support may place equipment at a venue the event has requested while the request is still pending';
+ end if;
+ result := public.manage_equipment_requirements('arrange',95302,95399,3,
+  '{"shortfall":0,"placement_venue_id":95303,"placement_position":"Terrace bar"}');
+ if result->>'outcome' is distinct from 'ok' or (result->'requests' @>
+   '[{"request_id":95399,"placement_venue_id":95303,"placement_venue_name":"Booked terrace","placement_position":"Terrace bar","version":4}]'::jsonb) is not true then
+  raise exception '[SG2-53:placement-booked-venue] [SG2-53:AC6] [NORMAL] Support may place equipment at a venue the event has a confirmed booking for';
+ end if;
+end $$;
+reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d5300000-0000-4000-8000-000000000004',true);
 do $$
