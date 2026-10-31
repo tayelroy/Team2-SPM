@@ -11,6 +11,7 @@ import type { RegistrationWindow } from '../api/eventConfirmation';
 import { isoToSgtLocal, sgtToIso } from '../venues/searchApi';
 import { formatSgtTimestamp } from './EventAuditDrawer';
 import { terminalEventStatus, TERMINAL_REGISTRATION_STATE } from '../eventLifecycle';
+import { blockNonDigitKeys } from '../digitsOnly';
 
 type Props = { eventId: number; accessToken: string };
 
@@ -289,7 +290,7 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
       <div className="registration-fields">
         <label>
           Capacity
-          <input type="number" min={1} inputMode="numeric" value={draft.capacity} disabled={busy}
+          <input type="number" min={1} inputMode="numeric" onKeyDown={blockNonDigitKeys} value={draft.capacity} disabled={busy}
             onChange={(event) => setDraft({ ...draft, capacity: event.target.value })} />
         </label>
         <label>
@@ -304,7 +305,7 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
         </label>
         <label>
           Hold an offered place for (hours)
-          <input type="number" min={1} max={MAX_RESPONSE_HOURS} inputMode="numeric" value={draft.hours} disabled={busy}
+          <input type="number" min={1} max={MAX_RESPONSE_HOURS} inputMode="numeric" onKeyDown={blockNonDigitKeys} value={draft.hours} disabled={busy}
             onChange={(event) => setDraft({ ...draft, hours: event.target.value })} />
         </label>
       </div>

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { Card, Eyebrow, Fact, GhostButton, RecessedCard } from '../ui';
 import { color, gradient, label, radius } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
+import { blockNonDigitKeys } from '../digitsOnly';
 import { LAYOUT_LABELS, LAYOUTS, describeLayouts, type Layout } from '../venues/layoutsApi';
 import { EMPTY_SEARCH, VenueSearchError, formatSgt, isoToSgtLocal, searchVenues, sgtToIso, type VenueMatch, type VenueSearchValues } from '../venues/searchApi';
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
@@ -130,7 +131,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
               <label htmlFor="search-attendance" style={label}>Attendance</label>
-              <input id="search-attendance" type="number" min={1} step={1} value={values.attendance} style={inputStyle}
+              <input id="search-attendance" type="number" min={1} step={1} onKeyDown={blockNonDigitKeys} value={values.attendance} style={inputStyle}
                 placeholder="Expected guests" onChange={set('attendance')} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>

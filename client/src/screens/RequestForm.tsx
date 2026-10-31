@@ -8,6 +8,7 @@ import { NEXT_STEPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import { isoToSgtLocal, sgtToIso } from '../venues/searchApi';
+import { digitsOnly } from '../digitsOnly';
 import { EventVenueFit } from '../venues/VenueFit';
 import {
   Card,
@@ -90,6 +91,7 @@ function FormField({
   errorText,
   min,
   type = 'text',
+  inputMode,
 }: {
   label: string;
   fieldKey: RequiredField;
@@ -101,6 +103,7 @@ function FormField({
   errorText?: string;
   min?: string;
   type?: 'text' | 'datetime-local';
+  inputMode?: 'numeric';
 }) {
   const id = `rf-${fieldKey}`;
   const errorId = `${id}-error`;
@@ -116,6 +119,7 @@ function FormField({
       <input
         id={id}
         type={type}
+        inputMode={inputMode}
         value={value}
         min={min}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(fieldKey, e.target.value)}
@@ -348,15 +352,13 @@ export default function RequestForm({
   // Both create and update replace the entire draft: omitted blank fields
   // become null on the server, so clearing a previously saved value persists.
   async function persistDraft() {
-    const attendanceValue = Number(values.expected_attendance);
     const payload = {
       ...(values.name.trim() ? { name: values.name.trim() } : {}),
       ...(values.purpose.trim() ? { purpose: values.purpose.trim() } : {}),
       ...(values.description.trim() ? { description: values.description.trim() } : {}),
       ...(values.proposed_date.trim() ? { proposed_date: values.proposed_date.trim() } : {}),
-      ...(values.expected_attendance.trim() && Number.isFinite(attendanceValue)
-        ? { expected_attendance: attendanceValue }
-        : {}),
+      // The field holds digits only, so any value is a whole number.
+      ...(values.expected_attendance ? { expected_attendance: Number(values.expected_attendance) } : {}),
       ...(values.venue_requirements.trim() ? { venue_requirements: values.venue_requirements.trim() } : {}),
       ...(values.preferred_layout.trim() ? { preferred_layout: values.preferred_layout.trim() } : {}),
       ...(values.accessibility_needs.trim() ? { accessibility_needs: values.accessibility_needs.trim() } : {}),
@@ -561,7 +563,8 @@ export default function RequestForm({
             label="Expected attendance"
             fieldKey="expected_attendance"
             value={values.expected_attendance}
-            onChange={setField}
+            onChange={(key, value) => { if (digitsOnly(value)) setField(key, value); }}
+            inputMode="numeric"
             hint="Drives venue suitability checks"
             hasError={
               touched.has('expected_attendance') && !values.expected_attendance.trim()

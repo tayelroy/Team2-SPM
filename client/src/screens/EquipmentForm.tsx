@@ -3,6 +3,7 @@ import { STATUS_LABELS, type EquipmentRecord, type EquipmentValues, type Operati
 import { Card, Eyebrow, GhostButton } from '../ui';
 import { color, gradient, label, radius } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
+import { blockNonDigitKeys } from '../digitsOnly';
 const TEXT_FIELDS = [['type', 'Equipment type', 255], ['description', 'Description', 2000], ['location', 'Location', 2000]] as const;
 export default function EquipmentForm({ equipment, saving, error, conflict, onSave, onCancel, onReload }: {
   equipment: EquipmentRecord | null; saving: boolean; error: string; conflict: boolean;
@@ -34,7 +35,7 @@ export default function EquipmentForm({ equipment, saving, error, conflict, onSa
               onChange={event => setValues(current => ({ ...current, [key]: event.target.value }))} />
           </label>)}
           <label htmlFor="equipment-quantity" style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }}>Quantity held
-            <input id="equipment-quantity" required type="number" min={0} max={2147483647} step={1} value={values.quantity} style={inputStyle}
+            <input id="equipment-quantity" required type="number" min={0} max={2147483647} step={1} value={values.quantity} style={inputStyle} onKeyDown={blockNonDigitKeys}
               onChange={event => setValues(current => ({ ...current, quantity: event.target.value }))} />
           </label>
           <label htmlFor="equipment-status" style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }}>Operational status

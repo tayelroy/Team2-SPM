@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { blockNonDigitKeys } from '../digitsOnly';
 import { Card, Eyebrow, GhostButton } from '../ui';
 import { color, gradient, label, radius, rule, surface } from '../theme';
 import type { Venue, VenueValues } from './api';
@@ -115,7 +116,7 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
                   ) : (
                     <input id={`venue-${key}`} required type={key === 'capacity' ? 'number' : 'text'}
                       min={key === 'capacity' ? 1 : undefined} max={key === 'capacity' ? 2147483647 : undefined}
-                      step={key === 'capacity' ? 1 : undefined} value={values[key]} placeholder={placeholder}
+                      step={key === 'capacity' ? 1 : undefined} onKeyDown={key === 'capacity' ? blockNonDigitKeys : undefined} value={values[key]} placeholder={placeholder}
                       style={inputStyle} onChange={e => setValues(current => ({ ...current, [key]: e.target.value }))} />
                   )}
                 </div>
@@ -169,7 +170,7 @@ export default function VenueForm({ venue, layouts, operations, saving, error, o
                   {([['setup', 'Setup time (minutes)'], ['turnaround', 'Turnaround time (minutes)']] as const).map(([key, title]) => (
                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                       <label htmlFor={`venue-${key}-minutes`} style={label}>{title}</label>
-                      <input id={`venue-${key}-minutes`} type="number" min={0} max={MAX_MINUTES} step={1} required
+                      <input id={`venue-${key}-minutes`} type="number" min={0} max={MAX_MINUTES} step={1} required onKeyDown={blockNonDigitKeys}
                         value={timing[key]} style={inputStyle}
                         onChange={e => setTiming(current => ({ ...current, [key]: e.target.value }))} />
                     </div>

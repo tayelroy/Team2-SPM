@@ -7,6 +7,7 @@ import { loadNotificationInbox, readNotification, readAllNotifications, loadRemi
 import { formatSgtTimestamp } from './EventAuditDrawer';
 import { color, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, IconButton, Notice } from '../ui';
+import { blockNonDigitKeys } from '../digitsOnly';
 
 // Hold notices are written by the database with the expiry as a raw UTC
 // instant (e.g. "expiry 2030-06-03T02:00:00.000Z"); show it in Singapore time.
@@ -138,7 +139,7 @@ function ReminderFrequency({ accessToken }: { accessToken: string }) {
   }} style={{ border: rule.faint, borderRadius: radius.sm, padding: '14px', display: 'grid', gap: '10px' }}>
     <label htmlFor="reminder-frequency" style={{ color: color.platinum, fontSize: '14px' }}>Reminder frequency (days)</label>
     <p style={{ color: color.silver, margin: 0, fontSize: '12px', lineHeight: 1.5 }}>Upcoming events with outstanding arrangements. Daily by default; choose 1–30 days.</p>
-    <input id="reminder-frequency" type="number" min="1" max="30" step="1" value={days} disabled={!ready || saving}
+    <input id="reminder-frequency" type="number" min="1" max="30" step="1" onKeyDown={blockNonDigitKeys} value={days} disabled={!ready || saving}
       onChange={event => setDays(event.target.value)} style={{ width: '100%', minWidth: 0, padding: '9px', boxSizing: 'border-box' }} />
     <button type="submit" disabled={!ready || saving || !valid} style={{ padding: '10px', color: color.platinum,
       background: 'transparent', border: rule.faint, borderRadius: radius.sm }}>{saving ? 'Saving…' : 'Save reminder frequency'}</button>

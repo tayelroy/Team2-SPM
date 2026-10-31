@@ -7,6 +7,7 @@ import {
 } from '../api/eventRequests';
 import { loadSession } from '../auth/session';
 import { terminalEventStatus } from '../eventLifecycle';
+import { blockNonDigitKeys } from '../digitsOnly';
 import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import {
@@ -632,6 +633,7 @@ function PlanningDrawerPanel({
                 id="epd-expected-attendance"
                 type="number"
                 min="1"
+                onKeyDown={blockNonDigitKeys}
                 disabled={detailsDisabled}
                 value={expectedAttendance}
                 placeholder="e.g. 150"
