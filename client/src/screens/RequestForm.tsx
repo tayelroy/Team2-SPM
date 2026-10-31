@@ -1,3 +1,4 @@
+import { futureSgtMinute } from '../utils/futureDates';
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { loadSession } from '../auth/session';
@@ -554,7 +555,7 @@ export default function RequestForm({
             hint="Singapore time (SGT)"
             hasError={(touched.has('proposed_date') && !values.proposed_date.trim()) || datePast}
             errorText={datePast ? PAST_DATE_MESSAGE : undefined}
-            min={isoToSgtLocal(new Date(nowMs).toISOString())}
+            min={futureSgtMinute(nowMs)}
           />
           <FormField
             label="Expected attendance"

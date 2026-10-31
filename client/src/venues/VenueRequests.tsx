@@ -1,3 +1,4 @@
+import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Badge, Card, Fact, GhostButton, Notice } from '../ui';
@@ -96,8 +97,8 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!values.from || !values.until || values.from >= values.until) {
-      setError('Enter a period that starts before it ends.');
+    if (!isFuturePeriod(values.from, values.until)) {
+      setError('Enter a future period that starts before it ends.');
       return;
     }
     if (asksReason && !reason.trim()) {
@@ -124,7 +125,7 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
     {([['from', 'Request from'], ['until', 'Request until']] as const).map(([key, title]) => (
       <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
         <label htmlFor={`${id}-${key}`} style={label}>{title} (Singapore time)</label>
-        <input id={`${id}-${key}`} type="datetime-local" required value={values[key]} style={inputStyle} onChange={set(key)} />
+        <input id={`${id}-${key}`} type="datetime-local" min={key === 'from' ? futureSgtMinute() : endMinimum(values.from)} required value={values[key]} style={inputStyle} onChange={set(key)} />
       </div>
     ))}
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>

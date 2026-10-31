@@ -1,3 +1,4 @@
+import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { EquipmentAvailabilityError, loadEquipmentAvailability, type AvailabilityPeriod, type EquipmentAvailability as Availability } from '../api/equipmentAvailability';
 import { Fact, GhostButton } from '../ui';
@@ -35,8 +36,8 @@ function AvailabilityCheck({ eventId, requestId, equipmentType, token }: { event
   function choose(event: FormEvent) {
     event.preventDefault(); if (pending.current) return;
     const from = new Date(`${start}+08:00`); const until = new Date(`${end}+08:00`);
-    if (!start || !end || !Number.isFinite(from.getTime()) || !Number.isFinite(until.getTime()) || until <= from) {
-      setResult(null); setError('Choose both dates, with the end after the start.'); return;
+    if (!isFuturePeriod(start, end)) {
+      setResult(null); setError('Choose both dates in the future, with the end after the start.'); return;
     }
     void check({ starts_at: from.toISOString(), ends_at: until.toISOString() });
   }
@@ -62,8 +63,8 @@ function AvailabilityCheck({ eventId, requestId, equipmentType, token }: { event
       </div> : null}
       <form aria-label={`Availability dates for ${equipmentType}`} onSubmit={choose} noValidate>
         <fieldset disabled={loading} style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', border: 0, margin: 0, padding: 0, minWidth: 0 }}>
-          <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-start`}>Availability starts (Singapore time)<input id={`${id}-start`} type="datetime-local" required value={start} onChange={event => setStart(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
-          <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-end`}>Availability ends (Singapore time)<input id={`${id}-end`} type="datetime-local" required value={end} onChange={event => setEnd(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
+          <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-start`}>Availability starts (Singapore time)<input id={`${id}-start`} type="datetime-local" min={futureSgtMinute()} required value={start} onChange={event => setStart(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
+          <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-end`}>Availability ends (Singapore time)<input id={`${id}-end`} type="datetime-local" min={endMinimum(start)} required value={end} onChange={event => setEnd(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
           <button type="submit" className="organisation-button" style={{ justifySelf: 'start', alignSelf: 'end' }} disabled={loading}>Check selected dates</button>
         </fieldset>
       </form>

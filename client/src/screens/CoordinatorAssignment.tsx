@@ -139,7 +139,7 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
                 value={selected}
                 onChange={(event) => setPicked((current) => ({ ...current, [request.eventId]: event.target.value }))}
                 style={{
-                  background: surface.field,
+                  backgroundColor: surface.field,
                   border: rule.control,
                   borderRadius: radius.sm,
                   padding: '13px 14px',

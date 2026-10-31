@@ -75,3 +75,11 @@ test.each([
   expect(vi.mocked(loadEquipmentAvailability).mock.calls[1][3]).not.toBe(signal);
   expect(vi.mocked(loadEquipmentAvailability).mock.calls[1][3].aborted).toBe(false);
 });
+
+test('[FAILURE] [SG2-54:AC1] refuses past scheduling dates even when native validation is bypassed', async () => {
+  await check();
+  dates('2000-01-01T10:00', '2000-01-01T12:00');
+  submit();
+  expect(screen.getByRole('alert')).toHaveTextContent('Choose both dates in the future');
+  expect(loadEquipmentAvailability).toHaveBeenCalledTimes(1);
+});

@@ -1,3 +1,4 @@
+import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Role } from '../mock/types';
 import { changeHold, changeHoldExpiry, createHold, fetchHolds, fetchHoldOptions, type HoldOptions, type VenueHold } from '../venues/holdsApi';
@@ -68,8 +69,8 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
     }
     // SG2-44: typed times are Singapore time, matching how holds are listed.
     const start = sgtToMs(form.start), end = sgtToMs(form.end), expiry = sgtToMs(form.expiry);
-    if (start >= end || expiry <= Date.now()) {
-      setError('The period must end after it starts, and the expiry must be in the future.'); return;
+    if (!isFuturePeriod(form.start, form.end) || !Number.isFinite(expiry) || expiry <= Date.now()) {
+      setError('The period must start in the future and end after it starts, and the expiry must be in the future.'); return;
     }
     busy.current = true; setPending(true);
     const result = await createHold(accessToken, { event_id: Number(form.event), venue_id: Number(form.venue),
@@ -124,8 +125,8 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
             <label>Venue<select required value={form.venue} onChange={event => setForm(previous => ({ ...previous, venue: event.target.value }))}>
               <option value="">Select venue</option>{options.venues.map(venue => <option key={venue.venue_id} value={venue.venue_id}>{venue.name}</option>)}
             </select></label>
-            <label>Period starts (Singapore time)<input required type="datetime-local" value={form.start} onChange={event => setForm(previous => ({ ...previous, start: event.target.value }))} /></label>
-            <label>Period ends (Singapore time)<input required type="datetime-local" value={form.end} onChange={event => setForm(previous => ({ ...previous, end: event.target.value }))} /></label>
+            <label>Period starts (Singapore time)<input required type="datetime-local" min={futureSgtMinute()} value={form.start} onChange={event => setForm(previous => ({ ...previous, start: event.target.value }))} /></label>
+            <label>Period ends (Singapore time)<input required type="datetime-local" min={endMinimum(form.start)} value={form.end} onChange={event => setForm(previous => ({ ...previous, end: event.target.value }))} /></label>
             <label>Hold expires (Singapore time)<input required type="datetime-local" min={expiryMinimum} value={form.expiry} onChange={event => setForm(previous => ({ ...previous, expiry: event.target.value }))} /></label>
           </div>
           <button type="submit" className="organisation-button organisation-button-primary" disabled={pending}>{pending ? 'Placing hold…' : 'Place hold'}</button>

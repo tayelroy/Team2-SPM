@@ -82,7 +82,7 @@ test('[FAILURE] [SG2-84:AC1,AC2] missing expiry or selection never dispatches a 
 
 test.each(['2030-06-12T09:00', '2030-06-12T08:59'])('[BOUNDARY] [SG2-84:AC1,AC2] expiry %s is not in the future', async expiry => {
   await open(); fill(expiry); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('The period must end after it starts, and the expiry must be in the future.');
+  expect(screen.getByRole('alert')).toHaveTextContent('The period must start in the future and end after it starts, and the expiry must be in the future.');
   expect(createHold).not.toHaveBeenCalled();
 });
 

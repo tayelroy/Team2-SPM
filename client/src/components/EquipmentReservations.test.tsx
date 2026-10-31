@@ -98,7 +98,7 @@ test.each([new EquipmentAvailabilityError(503), new Error('Private availability 
   expect(screen.queryByText('Private availability failure')).not.toBeInTheDocument(); dates(); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/); expect(reserveEquipment).toHaveBeenCalledTimes(1);
 });
 test.each([['', ''], ['2030-06-02T10:00', ''], ['', '2030-06-02T10:00'], ['2030-06-02T10:00', '2030-06-02T10:00'], ['2030-06-02T10:00', '2030-06-01T10:00']])('[FAILURE] [BOUNDARY] [SG2-55:AC1] invalid reservation range %s to %s clears stale advice and refuses dispatch', async (start, end) => {
-  await form(); dates(start, end); submit(); expect(screen.getByRole('alert')).toHaveTextContent('Choose both dates, with the end after the start.'); expect(reserveEquipment).not.toHaveBeenCalled(); expect(screen.queryByText('Available for the suggested period')).not.toBeInTheDocument();
+  await form(); dates(start, end); submit(); expect(screen.getByRole('alert')).toHaveTextContent('Choose both dates in the future, with the end after the start.'); expect(reserveEquipment).not.toHaveBeenCalled(); expect(screen.queryByText('Available for the suggested period')).not.toBeInTheDocument();
   dates(); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/); expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 test('[BOUNDARY] [SG2-55:AC1] non-finite dates cannot be submitted even if a DOM adapter bypasses datetime input sanitization', async () => {
