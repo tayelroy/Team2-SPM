@@ -29,6 +29,36 @@ function fill(expiry = '2030-06-14T09:00', end = '2030-06-15T17:00') {
   fireEvent.change(screen.getByLabelText('Hold expires (Singapore time)'), { target: { value: expiry } });
 }
 
+test('[BOUNDARY] [SG2-106:AC3] both expiry pickers reject past/current minutes and accept the next SGT minute', async () => {
+  // Singapore is already on the next day, although this browser runs in UTC.
+  vi.setSystemTime(new Date('2030-06-12T16:00:30Z'));
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  for (const label of ['Hold expires (Singapore time)', 'New expiry (Singapore time)']) {
+    const input = screen.getByLabelText(label) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '2030-06-12T23:59' } });
+    expect(input.validity.rangeUnderflow).toBe(true);
+    fireEvent.change(input, { target: { value: '2030-06-13T00:00' } });
+    expect(input.validity.rangeUnderflow).toBe(true);
+    fireEvent.change(input, { target: { value: '2030-06-13T00:01' } });
+    expect(input.checkValidity()).toBe(true);
+  }
+});
+
+test('[BOUNDARY] [SG2-106:AC3] an open expiry picker advances its minimum when the minute changes', async () => {
+  vi.useFakeTimers();
+  await act(async () => { render(<VenueHolds role="Venue Staff" accessToken="token" />); });
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  await act(async () => { vi.advanceTimersByTime(60_000); });
+  for (const label of ['Hold expires (Singapore time)', 'New expiry (Singapore time)']) {
+    const input = screen.getByLabelText(label) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '2030-06-12T09:01' } });
+    expect(input.validity.rangeUnderflow).toBe(true);
+    fireEvent.change(input, { target: { value: '2030-06-12T09:02' } });
+    expect(input.checkValidity()).toBe(true);
+  }
+});
+
 test('[NORMAL] [SG2-84:AC1,AC4,AC6] staff create a persisted tentative hold with an explicit expiry', async () => {
   vi.mocked(fetchHolds).mockResolvedValue({ ok: true, data: [] });
   vi.mocked(createHold).mockResolvedValue({ ok: true, data: hold });

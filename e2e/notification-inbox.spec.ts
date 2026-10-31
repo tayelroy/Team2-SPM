@@ -108,6 +108,12 @@ test('SG2-69-B02 | [BOUNDARY] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC4] a thousand 
 
 test('SG2-69-P02 | [BOUNDARY] [SG2-69:AC5] [SG2-69:AC6] a coordinator saves the daily default and thirty-day reminder frequency and sees it after reload', async ({ page, request }) => {
   expect((await request.post('/__e2e/notification-inbox')).status()).toBe(204);
+  const preferenceWrites: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'PUT' && new URL(request.url()).pathname === '/api/notifications/reminder-preferences') {
+      preferenceWrites.push(request.postData()!);
+    }
+  });
   await signIn(page);
   await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
   const frequency = inbox(page).getByLabel('Reminder frequency (days)', { exact: true });
@@ -119,6 +125,18 @@ test('SG2-69-P02 | [BOUNDARY] [SG2-69:AC5] [SG2-69:AC6] a coordinator saves the 
   await page.reload();
   await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
   await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveValue('30');
+
+  // Manual walkthrough 5.3: 31 must be refused in Notifications, and must
+  // not overwrite the valid preference already saved for this coordinator.
+  await frequency.fill('31');
+  await expect(inbox(page).getByRole('button', { name: 'Save reminder frequency', exact: true })).toBeDisabled();
+  expect(await frequency.evaluate((input: HTMLInputElement) => input.validity.rangeOverflow)).toBe(true);
+  await frequency.press('Enter');
+  await page.reload();
+  await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+  await expect(frequency).toHaveValue('30');
+  expect((await ledger(page)).preferences).toEqual([{ user_id: 'user-coordinator', frequency_days: 30 }]);
+  expect(preferenceWrites).toEqual([JSON.stringify({ frequency_days: 30 })]);
 });
 
 test('SG2-69-N01 | [CONFLICT] [SG2-69:AC3] [SG2-69:AC4] [SG2-69:AC7] an unrelated account cannot read the target, mark another notice, or change coordinator reminder settings', async ({ page, request }) => {
