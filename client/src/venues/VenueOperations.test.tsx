@@ -188,3 +188,13 @@ test('[CONFLICT] [SG2-77:AC6] leaving the page while the times are saving aborts
   release(Response.json({ operations: recorded }));
   await act(async () => {});
 });
+
+test('[FAILURE] [SG2-77:AC4] setup and turnaround minutes drop e, +, - and . keystrokes and keep digits', async () => {
+  await open(staff, recorded);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
+  for (const label of ['Setup time (minutes)', 'Turnaround time (minutes)']) {
+    const field = screen.getByLabelText(label);
+    for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+    expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+  }
+});

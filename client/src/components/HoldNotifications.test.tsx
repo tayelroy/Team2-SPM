@@ -376,3 +376,10 @@ test('[CONFLICT] [SG2-69:AC1] [SG2-69:AC6] [SG2-104:AC1] changing acting role wi
   expect(api.loadReminderPreferences).toHaveBeenCalledTimes(1);
   expect(api.loadNotificationInbox).toHaveBeenCalledTimes(4);
 });
+
+test('[FAILURE] [SG2-69:AC6] reminder frequency drops e, +, - and . keystrokes and keeps digits', async () => {
+  render(<HoldNotifications accessToken="token" coordinator />); await open(0);
+  const field = await screen.findByRole('spinbutton', { name: 'Reminder frequency (days)' }); await waitFor(() => expect(field).toBeEnabled());
+  for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+  expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+});

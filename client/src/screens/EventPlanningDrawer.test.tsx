@@ -267,6 +267,13 @@ describe('EventPlanningDrawer Component', () => {
     expect(screen.getByRole('dialog', { name: 'Event Planning Details' })).toBeVisible();
   });
 
+  test('[FAILURE] [SG2-39:AC1] Expected Attendance drops e, +, - and . keystrokes and keeps digits', () => {
+    render(<EventPlanningDrawer eventId={91} onClose={vi.fn()} initialValues={{ expected_attendance: 100 }} />);
+    const field = screen.getByLabelText('Expected Attendance');
+    for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+    expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+  });
+
   test('[NORMAL] [SG2-39:AC1] cancelling discards unsaved edits, so reopening shows the saved values', () => {
     const saved = { expected_attendance: 100, planning_notes: 'Catering booked', status: 'planning' };
     const onClose = vi.fn();

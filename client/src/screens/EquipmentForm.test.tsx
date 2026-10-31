@@ -101,3 +101,9 @@ test('[CONFLICT] [SG2-52:AC1] a stale version preserves the form and offers relo
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(props.onCancel).toHaveBeenCalledTimes(1);
 });
+
+test('[FAILURE] [SG2-52:AC1] Quantity held drops e, +, - and . keystrokes and keeps digits', () => {
+  open(); const field = screen.getByLabelText('Quantity held');
+  for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+  expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+});

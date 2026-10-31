@@ -346,3 +346,14 @@ describe('RegistrationPanel waiting list (SG2-61, SG2-62 AC6)', () => {
   });
 });
 
+
+test('[FAILURE] [SG2-63:AC5] [SG2-62:AC6] capacity and offered-place hours drop e, +, - and . keystrokes and keep digits', async () => {
+  serve(() => Response.json(OWNER_VIEW));
+  render(<RegistrationPanel eventId={12} accessToken="token" />);
+  const form = within(await screen.findByRole('form', { name: 'Registration settings' }));
+  for (const label of ['Capacity', 'Hold an offered place for (hours)']) {
+    const field = form.getByLabelText(label);
+    for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+    expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+  }
+});

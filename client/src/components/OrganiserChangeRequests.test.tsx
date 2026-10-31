@@ -154,3 +154,14 @@ test('[FAILURE] [SG2-64:AC1] a past Singapore change-request date is refused bef
   expect(screen.getByLabelText('New event date and time (Singapore time)')).toHaveAttribute('min', '2030-06-27T10:01');
   expect(raise).not.toHaveBeenCalled();
 });
+
+test('[FAILURE] [SG2-64:AC1] a new expected attendance drops e, +, - and . keystrokes while a new name keeps them', async () => {
+  listing();
+  render(<OrganiserChangeRequests eventId={12} accessToken="t" />);
+  fireEvent.change(await screen.findByLabelText('What should change'), { target: { value: 'expected_attendance' } });
+  const field = screen.getByLabelText(/^New /);
+  for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+  expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+  fireEvent.change(screen.getByLabelText('What should change'), { target: { value: 'name' } });
+  expect(fireEvent.keyDown(screen.getByLabelText(/^New /), { key: 'e' })).toBe(true);
+});
