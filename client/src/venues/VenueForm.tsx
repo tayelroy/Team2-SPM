@@ -17,8 +17,8 @@ const FIELDS = [
 ] as const;
 const EMPTY = { name: '', location: '', capacity: '', facilities: '', accessibility_features: '', operating_information: '' };
 export const inputStyle = {
-  width: '100%', minWidth: 0, background: surface.field, border: rule.control,
-  borderRadius: radius.sm, padding: '13px 14px', color: color.mist, fontSize: '14px', lineHeight: 1.5
+  width: '100%', minWidth: 0, minHeight: '48px', backgroundColor: surface.field, border: rule.control,
+  borderRadius: radius.sm, padding: '12px 14px', color: color.mist, fontSize: '14px', lineHeight: 1.5
 };
 
 export default function VenueForm({ venue, layouts, operations, saving, error, onSave, onCancel }: {

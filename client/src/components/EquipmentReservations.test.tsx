@@ -89,7 +89,10 @@ test.each([
   expect(reserveEquipment).toHaveBeenCalledExactlyOnceWith(7, 11, 'token', expect.any(AbortSignal), { version: 2, starts_at: `2030-06-01T02:00:00.${expectedStart}Z`, ends_at: `2030-06-01T02:00:00.${expectedEnd}Z` });
 });
 test('[BOUNDARY] [SG2-55:AC1] explicit millisecond dates are transmitted exactly without retaining the old suggested period', async () => {
-  await form(); dates('2030-06-02T10:00:30.123', '2030-06-02T10:00:30.124'); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/);
+  await form(); dates('2030-06-02T10:00:30.123', '2030-06-02T10:00:30.124');
+  expect(screen.getByLabelText('Reserve until (Singapore time)')).toHaveAttribute('min', '2030-06-02T10:00:30.124');
+  expect((screen.getByLabelText('Reserve until (Singapore time)') as HTMLInputElement).checkValidity()).toBe(true);
+  submit(); await screen.findByText(/The assigned Event Coordinator has been notified/);
   expect(reserveEquipment).toHaveBeenCalledExactlyOnceWith(7, 11, 'token', expect.any(AbortSignal), { version: 2, starts_at: '2030-06-02T02:00:30.123Z', ends_at: '2030-06-02T02:00:30.124Z' });
 });
 test.each([new EquipmentAvailabilityError(503), new Error('Private availability failure')])('[FAILURE] [SG2-55:AC1] unavailable advisory still allows explicit dates with the final server stock check', async failure => {
@@ -98,7 +101,7 @@ test.each([new EquipmentAvailabilityError(503), new Error('Private availability 
   expect(screen.queryByText('Private availability failure')).not.toBeInTheDocument(); dates(); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/); expect(reserveEquipment).toHaveBeenCalledTimes(1);
 });
 test.each([['', ''], ['2030-06-02T10:00', ''], ['', '2030-06-02T10:00'], ['2030-06-02T10:00', '2030-06-02T10:00'], ['2030-06-02T10:00', '2030-06-01T10:00']])('[FAILURE] [BOUNDARY] [SG2-55:AC1] invalid reservation range %s to %s clears stale advice and refuses dispatch', async (start, end) => {
-  await form(); dates(start, end); submit(); expect(screen.getByRole('alert')).toHaveTextContent('Choose both dates, with the end after the start.'); expect(reserveEquipment).not.toHaveBeenCalled(); expect(screen.queryByText('Available for the suggested period')).not.toBeInTheDocument();
+  await form(); dates(start, end); submit(); expect(screen.getByRole('alert')).toHaveTextContent('Choose both dates in the future, with the end after the start.'); expect(reserveEquipment).not.toHaveBeenCalled(); expect(screen.queryByText('Available for the suggested period')).not.toBeInTheDocument();
   dates(); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/); expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 test('[BOUNDARY] [SG2-55:AC1] non-finite dates cannot be submitted even if a DOM adapter bypasses datetime input sanitization', async () => {

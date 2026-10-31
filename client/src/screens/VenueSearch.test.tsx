@@ -544,7 +544,7 @@ test('[BOUNDARY] [SG2-46:AC2] [SG2-48:AC3] an invalid new period does not revali
   await within(requests).findByText('Pending');
   fill({ 'Until (Singapore time)': '2030-06-14T23:00' });
   fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('Enter a period that starts before it ends.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
   expect(within(requests).getByText('Pending')).toBeVisible();
   expect(state.requests).toBe(1); expect(state.bookings).toBe(1);
 });
@@ -598,4 +598,36 @@ test('[BOUNDARY] [SG2-48:AC3] [SG2-82:AC4] leaving an event aborts its search an
   const eventReads = fetch.mock.calls.filter(([url]) => url.startsWith('/api/venue-book'));
   expect(eventReads.map(([url]) => url)).toEqual(['/api/venue-booking-requests?event_id=20', '/api/venue-bookings?event_id=20']);
   expect(eventReads.every(([, init]) => (init?.headers as Record<string, string>).Authorization === 'Bearer new-token')).toBe(true);
+});
+
+
+test('[BOUNDARY] [SG2-46:AC2] Singapore minimums and submit guards reject past starts, including after the form sits open', () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-31T16:30:20Z'));
+  try {
+    const fetch = stubSearch(() => Response.json({ venues: [] }));
+    render(<VenueSearch accessToken="token" />);
+    const from = screen.getByLabelText('From (Singapore time)');
+    const until = screen.getByLabelText('Until (Singapore time)');
+    expect(from).toHaveAttribute('min', '2026-11-01T00:31');
+    fill({ 'From (Singapore time)': '2026-11-01T00:30', 'Until (Singapore time)': '2026-11-01T01:30' });
+    fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
+    expect(fetch).not.toHaveBeenCalled();
+    fill({ 'From (Singapore time)': '2026-11-01T00:31' });
+    expect(until).toHaveAttribute('min', '2026-11-01T00:32');
+    clock.mockReturnValue(Date.parse('2026-10-31T16:32:00Z'));
+    fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { clock.mockRestore(); }
+});
+
+test('[BOUNDARY] [SG2-46:AC2] an expired event prefill is rejected before the automatic search reaches the API', () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-06-15T01:00:00Z'));
+  try {
+    const fetch = stubSearch(() => Response.json({ venues: [] }));
+    render(<VenueSearch accessToken="token" prefill={prefill} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
+    expect(screen.getByLabelText('From (Singapore time)')).toHaveValue(prefill.values.from);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { clock.mockRestore(); }
 });

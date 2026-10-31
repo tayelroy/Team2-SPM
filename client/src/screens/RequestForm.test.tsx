@@ -683,8 +683,8 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
       initialValues={{ ...STORED, proposed_date: '2026-10-29T03:01:00.000Z' }} />);
     const date = screen.getByLabelText(/Date/i);
     expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
-    // The picker's earliest choice is now, in Singapore time.
-    expect(date).toHaveAttribute('min', '2026-10-29T11:00');
+    // The picker's earliest choice is the next minute, in Singapore time.
+    expect(date).toHaveAttribute('min', '2026-10-29T11:01');
 
     fireEvent.change(date, { target: { value: '2026-10-29T11:00' } });
     expect(screen.getByText('Date must be in the future')).toBeInTheDocument();

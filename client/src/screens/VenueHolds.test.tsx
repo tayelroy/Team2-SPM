@@ -82,7 +82,7 @@ test('[FAILURE] [SG2-84:AC1,AC2] missing expiry or selection never dispatches a 
 
 test.each(['2030-06-12T09:00', '2030-06-12T08:59'])('[BOUNDARY] [SG2-84:AC1,AC2] expiry %s is not in the future', async expiry => {
   await open(); fill(expiry); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('The period must end after it starts, and the expiry must be in the future.');
+  expect(screen.getByRole('alert')).toHaveTextContent('The period must end after it starts and must not have ended, and the expiry must be in the future.');
   expect(createHold).not.toHaveBeenCalled();
 });
 
@@ -303,4 +303,20 @@ test('[NORMAL] [SG2-106:AC3] changing one hold expiry leaves the other holds as 
   fireEvent.submit(within(card).getByRole('form', { name: 'Change expiry for hold #7' }));
   expect(await within(card).findByText(/Expiry: 20 Jun 2030, 10:00 \(SGT\)/)).toBeInTheDocument();
   expect(within(screen.getByRole('article', { name: 'Hold #8' })).getByText(/Expiry: 14 Jun 2030, 09:00 \(SGT\)/)).toBeInTheDocument();
+});
+
+
+test('[NORMAL] [SG2-84:AC1,AC2] an ongoing hold period is accepted while an ended period is refused', async () => {
+  vi.mocked(createHold).mockResolvedValue({ ok: true, data: hold });
+  await open(); fill();
+  fireEvent.change(screen.getByLabelText('Period starts (Singapore time)'), { target: { value: '2030-06-12T08:00' } });
+  fireEvent.change(screen.getByLabelText('Period ends (Singapore time)'), { target: { value: '2030-06-12T09:00' } });
+  fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
+  expect(createHold).not.toHaveBeenCalled();
+  const start = screen.getByLabelText('Period starts (Singapore time)');
+  expect(start).not.toHaveAttribute('min');
+  fireEvent.change(screen.getByLabelText('Period ends (Singapore time)'), { target: { value: '2030-06-12T10:00' } });
+  fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Hold placed.');
+  expect(createHold).toHaveBeenCalledWith('token', expect.objectContaining({ starts_at: '2030-06-12T00:00:00.000Z', ends_at: '2030-06-12T02:00:00.000Z' }));
 });

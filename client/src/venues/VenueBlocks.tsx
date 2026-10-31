@@ -1,3 +1,4 @@
+import { endMinimum, isUnendedPeriod } from '../utils/futureDates';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Card, Eyebrow, GhostButton, Notice, RecessedCard } from '../ui';
@@ -80,7 +81,7 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
     const starts = sgtToMs(values.start);
     const ends = sgtToMs(values.end);
     const reason = values.reason.trim();
-    const rejected = Number.isNaN(starts) || Number.isNaN(ends) || starts >= ends || ends <= Date.now() ||
+    const rejected = !isUnendedPeriod(values.start, values.end) ||
       !(values.category in UNAVAILABILITY_CATEGORIES) || !reason || Array.from(reason).length > MAX_REASON_LENGTH;
     setInvalid(rejected);
     if (rejected) return;
@@ -161,7 +162,7 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                 <label htmlFor="block-end" style={label}>Unavailable until (Singapore time)</label>
-                <input id="block-end" type="datetime-local" required value={values.end} style={inputStyle}
+                <input id="block-end" min={endMinimum(values.start)} type="datetime-local" required value={values.end} style={inputStyle}
                   onChange={e => setValues(current => ({ ...current, end: e.target.value }))} />
               </div>
               <div className="venue-field-wide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>

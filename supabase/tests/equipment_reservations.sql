@@ -471,4 +471,52 @@ begin
   raise exception '[SG2-55:guarded-fresh-snapshot-rpc] [SG2-55:AC1] [NORMAL] Reservation writes must use a scoped definer and fresh statements after row-lock waits';
  end if;
 end $$;
+-- New receipt creation rejects past starts; existing ongoing receipts remain readable.
+insert into public.events(event_id,organiser_id,coordinator_id,name,status)
+ values(95522,'d5500000-0000-4000-8000-000000000002','d5500000-0000-4000-8000-000000000003','Future reservation boundary','planning');
+insert into public.equipment(equipment_id,name,quantity_total) values(95505,'Future boundary equipment',10);
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity)
+ values(95522,95522,95505,1);
+insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at)
+ values(95522,95505,1,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 hour');
+select set_config('request.jwt.claim.sub','d5500000-0000-4000-8000-000000000001',true);
+do $$
+declare instant timestamptz := clock_timestamp(); request_before jsonb; receipts_before jsonb; notices_before jsonb;
+ result jsonb; future_start timestamptz; future_end timestamptz; receipt jsonb;
+begin
+ select to_jsonb(r) into request_before from public.equipment_requests r where request_id=95522;
+ select jsonb_agg(to_jsonb(r) order by reservation_id) into receipts_before from public.equipment_reservations r where event_id=95522;
+ select jsonb_agg(to_jsonb(n) order by notification_id) into notices_before from public.notifications n where event_id=95522;
+ set local role authenticated;
+ if public.manage_equipment_reservations('reserve',95522,95522,1,instant-interval '1 hour',instant+interval '1 hour')
+   is distinct from '{"outcome":"invalid"}'::jsonb
+  or public.manage_equipment_reservations('reserve',95522,95522,1,instant,instant+interval '1 hour')
+   is distinct from '{"outcome":"invalid"}'::jsonb then
+  raise exception '[SG2-55:past-or-current-reservation-start-refused] [SG2-55:AC1] [FAILURE] [BOUNDARY] Direct RPC must reject a past start with a future end and a start at the captured current instant';
+ end if;
+ result := public.manage_equipment_reservations('read',95522);
+ if result->>'outcome' is distinct from 'ok' or jsonb_array_length(result->'reservations') <> 1
+  or (result->'reservations'->0->>'starts_at')::timestamptz >= instant
+  or (result->'reservations'->0->>'ends_at')::timestamptz <= instant then
+  raise exception '[SG2-55:ongoing-reservation-remains-readable] [SG2-55:AC4] [NORMAL] Existing ongoing receipts must retain their stored period and remain readable';
+ end if;
+ reset role;
+ if (select to_jsonb(r) from public.equipment_requests r where request_id=95522) is distinct from request_before
+  or (select jsonb_agg(to_jsonb(r) order by reservation_id) from public.equipment_reservations r where event_id=95522) is distinct from receipts_before
+  or (select jsonb_agg(to_jsonb(n) order by notification_id) from public.notifications n where event_id=95522) is distinct from notices_before then
+  raise exception '[SG2-55:past-start-refusal-without-mutation] [SG2-55:AC1] [FAILURE] Refusing a past/current start must not change request version, receipts or notifications';
+ end if;
+ -- A fixed future day avoids wall-clock races while exercising millisecond precision.
+ future_start := date_trunc('second',instant+interval '1 day')+interval '1 millisecond';
+ future_end := future_start+interval '1 millisecond';
+ set local role authenticated;
+ result := public.manage_equipment_reservations('reserve',95522,95522,1,future_start,future_end);
+ select item into receipt from jsonb_array_elements(result->'reservations') item where item->>'request_id'='95522';
+ if result->>'outcome' is distinct from 'ok'
+  or (receipt->>'starts_at')::timestamptz is distinct from future_start
+  or (receipt->>'ends_at')::timestamptz is distinct from future_end then
+  raise exception '[SG2-55:future-millisecond-reservation-retains-precision] [SG2-55:AC1] [BOUNDARY] Future one-millisecond periods must reserve with exact timestamps';
+ end if;
+ reset role;
+end $$;
 rollback;

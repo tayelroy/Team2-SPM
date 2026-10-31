@@ -14,7 +14,7 @@ import { Badge, Card, Eyebrow, Fact, GhostButton, GradientButton, Notice } from 
 
 const NO_FILTERS: OverviewFilters = { coordinatorId: '', status: '' };
 const fieldStyle = {
-  background: surface.field, border: rule.control, borderRadius: radius.sm,
+  backgroundColor: surface.field, border: rule.control, borderRadius: radius.sm,
   padding: '13px 14px', color: color.mist, fontSize: '14px', minHeight: '44px', maxWidth: '100%',
 } as const;
 

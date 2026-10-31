@@ -88,7 +88,7 @@ describe('OrganiserChangeRequests: asking for a change (SG2-64 AC1/AC2)', () => 
       fill('proposed_date', '2030-06-27T10:00', 'Speaker moved');
       expect(await screen.findByRole('status')).toHaveTextContent('Your coordinator will see it once one is assigned.');
       expect(raise).toHaveBeenLastCalledWith(12,
-        { field: 'proposed_date', to: new Date('2030-06-27T10:00').toISOString(), reason: 'Speaker moved' }, 't');
+        { field: 'proposed_date', to: new Date('2030-06-27T10:00+08:00').toISOString(), reason: 'Speaker moved' }, 't');
       fill('description', 'A longer agenda', 'More sessions');
       await vi.waitFor(() => expect(raise).toHaveBeenLastCalledWith(12,
         { field: 'description', to: 'A longer agenda', reason: 'More sessions' }, 't'));
@@ -115,13 +115,13 @@ describe('OrganiserChangeRequests: asking for a change (SG2-64 AC1/AC2)', () => 
       const raise = vi.spyOn(api, 'raiseChangeRequest');
       render(<OrganiserChangeRequests eventId={12} accessToken="t" />);
       fireEvent.change(screen.getByLabelText('What should change'), { target: { value: 'proposed_date' } });
-      const input = screen.getByLabelText('New event date and time');
+      const input = screen.getByLabelText('New event date and time (Singapore time)');
       // jsdom keeps a datetime-local value it cannot parse only when set directly.
       Object.defineProperty(input, 'value', { configurable: true, get: () => 'soon', set: () => {} });
       fireEvent.change(input, { target: { value: 'soon' } });
       fireEvent.change(screen.getByLabelText('Why it should change'), { target: { value: 'Why' } });
       fireEvent.click(screen.getByRole('button', { name: 'Ask for this change' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent('Give a valid date and time.');
+      expect(await screen.findByRole('alert')).toHaveTextContent('Give a valid date and time in the future (Singapore time).');
       expect(raise).not.toHaveBeenCalled();
     }
     {
@@ -140,4 +140,17 @@ describe('OrganiserChangeRequests: asking for a change (SG2-64 AC1/AC2)', () => 
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     }
   });
+});
+
+
+test('[FAILURE] [SG2-64:AC1] a past Singapore change-request date is refused before dispatch', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-06-27T02:00:00Z'));
+  listing();
+  const raise = vi.spyOn(api, 'raiseChangeRequest');
+  render(<OrganiserChangeRequests eventId={12} accessToken="token-12" />);
+  await screen.findByText(/no outstanding change requests/i);
+  fill('proposed_date', '2030-06-27T09:59', 'Speaker moved');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Give a valid date and time in the future (Singapore time).');
+  expect(screen.getByLabelText('New event date and time (Singapore time)')).toHaveAttribute('min', '2030-06-27T10:01');
+  expect(raise).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { futureSgtMinute } from '../utils/futureDates';
 import { useEffect, useId, useState } from 'react';
 import {
   fetchOwnChangeRequests,
@@ -74,9 +75,9 @@ export default function OrganiserChangeRequests({ eventId, accessToken }: Organi
     let to: string | number = value;
     if (chosen.input === 'number') to = Number(value);
     if (chosen.input === 'datetime') {
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        setError('Give a valid date and time.');
+      const parsed = new Date(`${value}+08:00`);
+      if (!Number.isFinite(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+        setError('Give a valid date and time in the future (Singapore time).');
         return;
       }
       to = parsed.toISOString();
@@ -106,7 +107,7 @@ export default function OrganiserChangeRequests({ eventId, accessToken }: Organi
     <input
       id={valueId}
       type={chosen.input === 'datetime' ? 'datetime-local' : chosen.input}
-      min={chosen.input === 'number' ? 1 : undefined}
+      min={chosen.input === 'number' ? 1 : chosen.input === 'datetime' ? futureSgtMinute() : undefined}
       value={value}
       onChange={(event) => setValue(event.target.value)}
       className="organisation-textarea"
@@ -144,7 +145,7 @@ export default function OrganiserChangeRequests({ eventId, accessToken }: Organi
         <option value="">Choose a detail</option>
         {CHANGE_FIELDS.map((option) => <option key={option.field} value={option.field}>{option.label}</option>)}
       </select>
-      {chosen ? <><label htmlFor={valueId}>{`New ${chosen.label.toLowerCase()}`}</label>{valueInput}</> : null}
+      {chosen ? <><label htmlFor={valueId}>{`New ${chosen.label.toLowerCase()}${chosen.input === 'datetime' ? ' (Singapore time)' : ''}`}</label>{valueInput}</> : null}
       <label htmlFor={`${ids}-reason`}>Why it should change</label>
       <textarea id={`${ids}-reason`} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} className="organisation-textarea" />
       <button type="button" className="organisation-button" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => void send()}>

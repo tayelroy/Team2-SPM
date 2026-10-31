@@ -91,7 +91,7 @@ test('SG2-55-B01 | [BOUNDARY] [FAILURE] [SG2-55:AC1] [SG2-55:AC3] mobile support
   await expect(panel(page).getByLabel('Reserve until (Singapore time)', { exact: true })).toHaveValue('');
   await panel(page).getByLabel('Reserve until (Singapore time)', { exact: true }).fill('2030-06-20T10:00');
   await panel(page).getByRole('button', { name: 'Reserve equipment', exact: true }).click();
-  await expect(panel(page).getByRole('alert')).toHaveText('Choose both dates, with the end after the start.');
+  await expect(panel(page).getByRole('alert')).toHaveText('Choose both dates in the future, with the end after the start.');
   expect((await ledger(page)).reservations).toEqual([]);
   await panel(page).getByLabel('Reserve until (Singapore time)', { exact: true }).fill('2030-06-20T14:00');
   await panel(page).getByRole('button', { name: 'Reserve equipment', exact: true }).click(); await fact(page, 'Quantity reserved', '12');

@@ -172,3 +172,21 @@ test('[FAILURE] [SG2-55:AC1] the default reservation adapter reports missing dat
     assert.equal(response.status, 503); assert.deepEqual(response.body, { error: 'Access service unavailable' });
   } finally { Object.assign(dbConfig, original); }
 });
+
+
+test('[FAILURE] [BOUNDARY] [SG2-55:AC1] reservation starts at or before now are refused before storage, while the next millisecond retains its precision', async t => {
+  const now = Date.parse('2030-01-01T09:00:00.000Z');
+  t.mock.method(Date, 'now', () => now);
+  const { app, calls } = fixture();
+  for (const starts_at of ['2030-01-01T08:59:59.999Z', '2030-01-01T09:00:00.000Z', '2030-01-01T17:00:00.000+08:00']) {
+    const response = await request(app).post(reserveUrl).set(auth).send({ ...body, starts_at });
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Choose a reservation start in the future.' });
+  }
+  assert.deepEqual(calls, []);
+  const response = await request(app).post(reserveUrl).set(auth).send({ ...body,
+    starts_at: '2030-01-01T17:00:00.001+08:00', ends_at: '2030-01-01T09:00:00.002Z' });
+  assert.equal(response.status, 201);
+  assert.deepEqual(calls, [['reserve', 7, 11, 3,
+    { starts_at: '2030-01-01T09:00:00.001Z', ends_at: '2030-01-01T09:00:00.002Z' }]]);
+});
