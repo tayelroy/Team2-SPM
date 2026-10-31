@@ -1,0 +1,69 @@
+{
+  "scope": "Actual application on the isolated loopback fixture server (e2e/server.ts, in-memory storage) in mcr.microsoft.com/playwright:v1.63.0-noble, commit 450c3f1. Each field was clicked and typed into key by key (pressSequentially), so keydown and input handling ran as for a user. No hosted account data.",
+  "results": [
+    {
+      "screen": "equipment-requirement-quantity",
+      "viewport": 390,
+      "field": "Quantity required",
+      "typed": "dasdd-1.5e12",
+      "value": "1512",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "equipment-arrangement-shortfall",
+      "viewport": 390,
+      "field": "Shortfall quantity",
+      "typed": "abc-0.5",
+      "value": "05",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "event-request-attendance",
+      "viewport": 390,
+      "field": "Expected attendance",
+      "typed": "many-1.5e150",
+      "value": "15150",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "venue-capacity",
+      "viewport": 390,
+      "field": "Capacity",
+      "typed": "e-+.125",
+      "value": "125",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "equipment-requirement-quantity",
+      "viewport": 1440,
+      "field": "Quantity required",
+      "typed": "dasdd-1.5e12",
+      "value": "1512",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "equipment-arrangement-shortfall",
+      "viewport": 1440,
+      "field": "Shortfall quantity",
+      "typed": "abc-0.5",
+      "value": "05",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "event-request-attendance",
+      "viewport": 1440,
+      "field": "Expected attendance",
+      "typed": "many-1.5e150",
+      "value": "15150",
+      "horizontalOverflow": false
+    },
+    {
+      "screen": "venue-capacity",
+      "viewport": 1440,
+      "field": "Capacity",
+      "typed": "e-+.125",
+      "value": "125",
+      "horizontalOverflow": false
+    }
+  ]
+}
