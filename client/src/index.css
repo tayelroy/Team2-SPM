@@ -54,8 +54,58 @@ button {
   font-family: inherit;
 }
 
+/* One baseline also covers controls in newer forms without inline styling. */
+form { min-width: 0; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+select,
+textarea {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px;
+  background-color: #011d1c;
+  color: #edfffe;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: dark;
+}
+
+textarea { resize: vertical; }
+
+/* Keep native keyboard and screen-reader behaviour, with an inset chevron. */
+select:not([multiple]):not([size]),
+select[size="1"] {
+  appearance: none;
+  padding-right: 44px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23edfffe' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  cursor: pointer;
+}
+
+select option,
+select optgroup { background: #011d1c; color: #edfffe; }
+select:disabled,
+input:disabled,
+textarea:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Browser date segments need room to shrink alongside the calendar button. */
+input[type="datetime-local"], input[type="date"] { width: 100%; }
+input::-webkit-datetime-edit { min-width: 0; padding: 0; }
+input::-webkit-calendar-picker-indicator { margin-left: 8px; cursor: pointer; flex-shrink: 0; }
+
+@media (forced-colors: active) {
+  select:not([multiple]):not([size]), select[size="1"] {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
 ::placeholder {
-  color: #707777;
+  color: #94aaa7;
+  opacity: 1;
 }
 
 /* Inputs and controls carry their own borders; show focus without shifting layout. */
@@ -220,7 +270,7 @@ a:hover {
 .venue-hold-form p, .venue-hold-card p { color: #adb9b8; line-height: 1.5; overflow-wrap: anywhere; }
 .venue-hold-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 18px; margin: 24px 0; }
 .venue-hold-fields label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; min-width: 0; }
-.venue-hold-fields input, .venue-hold-fields select { min-width: 0; width: 100%; box-sizing: border-box; padding: 12px; background: #082c2a; color: #e6f2ef; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font: inherit; color-scheme: dark; }
+.venue-hold-fields input, .venue-hold-fields select { min-width: 0; width: 100%; box-sizing: border-box; padding: 12px; background-color: #082c2a; color: #e6f2ef; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font: inherit; color-scheme: dark; }
 .venue-hold-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 18px; }
 .venue-hold-header, .venue-hold-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .venue-hold-header { justify-content: space-between; }

@@ -73,7 +73,7 @@ test('SG2-54-B01 | [BOUNDARY] [FAILURE] [SG2-54:AC1] [SG2-54:AC3] equal endpoint
   await availability(page).getByRole('button', { name: 'Check availability for Wireless microphones', exact: true }).click();
   await fact(page, 'Quantity remaining', '6');
   await chosen(page, '2030-06-20T14:00', '2030-06-20T14:00');
-  await expect(availability(page).getByRole('alert')).toHaveText('Choose both dates, with the end after the start.');
+  await expect(availability(page).getByRole('alert')).toHaveText('Choose both dates in the future, with the end after the start.');
   await expect(availability(page).getByText('Quantity remaining', { exact: true })).toHaveCount(0);
   const response = await page.request.get('/api/equipment-requests/1/availability?event_id=54&starts_at=2030-06-20T06:00:00Z&ends_at=2030-06-20T06:00:00Z', { headers: await auth(page) });
   expect(response.status()).toBe(400);

@@ -77,7 +77,7 @@ test('[BOUNDARY] [SG2-48:AC1] a searched layout the venue does not offer falls b
   expect(screen.getByText('None recorded for this event')).toBeVisible();
   fireEvent.change(screen.getByLabelText('Request until (Singapore time)'), { target: { value: '2030-06-15T10:00' } });
   send();
-  expect(screen.getByRole('alert')).toHaveTextContent('Enter a period that starts before it ends.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
   for (const label of ['Request from (Singapore time)', 'Request until (Singapore time)']) {
     cleanup();
     form({ layout: '' });

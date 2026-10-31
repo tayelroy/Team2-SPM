@@ -1,3 +1,4 @@
+import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Card, Eyebrow, Fact, GhostButton, RecessedCard } from '../ui';
@@ -59,6 +60,10 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   }, [replacing]);
 
   async function run(criteria: VenueSearchValues) {
+    if (!isFuturePeriod(criteria.from, criteria.until)) {
+      setInvalid(true);
+      return;
+    }
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -94,7 +99,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const rejected = !values.from || !values.until || values.from >= values.until;
+    const rejected = !isFuturePeriod(values.from, values.until);
     setInvalid(rejected);
     if (!rejected) void run(values);
   }
@@ -120,7 +125,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
             {([['from', 'From'], ['until', 'Until']] as const).map(([key, title]) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                 <label htmlFor={`search-${key}`} style={label}>{title} (Singapore time)</label>
-                <input id={`search-${key}`} type="datetime-local" required value={values[key]} style={inputStyle} onChange={set(key)} />
+                <input id={`search-${key}`} type="datetime-local" min={key === 'from' ? futureSgtMinute() : endMinimum(values.from)} required value={values[key]} style={inputStyle} onChange={set(key)} />
               </div>
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
@@ -151,7 +156,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
           <p style={{ color: color.silver, fontSize: '13px', lineHeight: 1.5 }}>
             Separate facility and accessibility keywords with commas. Blocked venues and venues with a confirmed booking in this period are not shown.
           </p>
-          {invalid ? <p role="alert">Enter a period that starts before it ends.</p> : null}
+          {invalid ? <p role="alert">Enter a future period that starts before it ends.</p> : null}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
             <button type="submit" style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',
               background: gradient.aurora, color: '#222', fontSize: '14px', cursor: loading ? 'wait' : 'pointer' }}>
