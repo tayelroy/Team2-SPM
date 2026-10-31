@@ -620,3 +620,14 @@ test('[BOUNDARY] [SG2-46:AC2] Singapore minimums and submit guards reject past s
     expect(fetch).not.toHaveBeenCalled();
   } finally { clock.mockRestore(); }
 });
+
+test('[BOUNDARY] [SG2-46:AC2] an expired event prefill is rejected before the automatic search reaches the API', () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-06-15T01:00:00Z'));
+  try {
+    const fetch = stubSearch(() => Response.json({ venues: [] }));
+    render(<VenueSearch accessToken="token" prefill={prefill} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
+    expect(screen.getByLabelText('From (Singapore time)')).toHaveValue(prefill.values.from);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { clock.mockRestore(); }
+});
