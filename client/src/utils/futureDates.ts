@@ -11,8 +11,17 @@ export function isFuturePeriod(start: string, end: string, now = Date.now()): bo
   return Number.isFinite(from) && Number.isFinite(until) && from > now && until > from;
 }
 
-/** Minute-precision forms must end at least one minute after their start. */
-export function endMinimum(start: string, now = Date.now()): string {
+/** Venue operations can record an ongoing period, but never one already ended. */
+export function isUnendedPeriod(start: string, end: string, now = Date.now()): boolean {
   const from = Date.parse(`${start}+08:00`);
-  return futureSgtMinute(Number.isFinite(from) ? Math.max(from, now) : now);
+  const until = Date.parse(`${end}+08:00`);
+  return Number.isFinite(from) && Number.isFinite(until) && until > from && until > now;
+}
+
+/** Match the field's step: minute forms round forward; precise reservations retain milliseconds. */
+export function endMinimum(start: string, now = Date.now(), precision: 'minute' | 'millisecond' = 'minute'): string {
+  const from = Date.parse(`${start}+08:00`);
+  const boundary = Number.isFinite(from) ? Math.max(from, now) : now;
+  return precision === 'minute' ? futureSgtMinute(boundary)
+    : new Date(boundary + 1 + SGT_OFFSET).toISOString().slice(0, 23);
 }

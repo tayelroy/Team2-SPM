@@ -1,4 +1,4 @@
-import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
+import { endMinimum, isUnendedPeriod } from '../utils/futureDates';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Card, Eyebrow, GhostButton, Notice, RecessedCard } from '../ui';
@@ -81,7 +81,7 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
     const starts = sgtToMs(values.start);
     const ends = sgtToMs(values.end);
     const reason = values.reason.trim();
-    const rejected = !isFuturePeriod(values.start, values.end) ||
+    const rejected = !isUnendedPeriod(values.start, values.end) ||
       !(values.category in UNAVAILABILITY_CATEGORIES) || !reason || Array.from(reason).length > MAX_REASON_LENGTH;
     setInvalid(rejected);
     if (rejected) return;
@@ -157,7 +157,7 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
             <div className="venue-fields">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
                 <label htmlFor="block-start" style={label}>Unavailable from (Singapore time)</label>
-                <input id="block-start" min={futureSgtMinute()} type="datetime-local" required value={values.start} style={inputStyle}
+                <input id="block-start" type="datetime-local" required value={values.start} style={inputStyle}
                   onChange={e => setValues(current => ({ ...current, start: e.target.value }))} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
@@ -180,7 +180,7 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
                   onChange={e => setValues(current => ({ ...current, reason: e.target.value }))} />
               </div>
             </div>
-            {invalid ? <p role="alert">Enter a future period that ends after it starts, choose a reason, and add a note within {MAX_REASON_LENGTH} characters.</p> : null}
+            {invalid ? <p role="alert">Enter a period that ends after it starts and has not already ended, choose a reason, and add a note within {MAX_REASON_LENGTH} characters.</p> : null}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '24px' }}>
               <button type="submit" style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',
                 background: gradient.aurora, color: '#222', fontSize: '14px', cursor: busy ? 'wait' : 'pointer' }}>

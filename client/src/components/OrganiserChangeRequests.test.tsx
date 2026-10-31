@@ -141,3 +141,16 @@ describe('OrganiserChangeRequests: asking for a change (SG2-64 AC1/AC2)', () => 
     }
   });
 });
+
+
+test('[FAILURE] [SG2-64:AC1] a past Singapore change-request date is refused before dispatch', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-06-27T02:00:00Z'));
+  listing();
+  const raise = vi.spyOn(api, 'raiseChangeRequest');
+  render(<OrganiserChangeRequests eventId={12} accessToken="token-12" />);
+  await screen.findByText(/no outstanding change requests/i);
+  fill('proposed_date', '2030-06-27T09:59', 'Speaker moved');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Give a valid date and time in the future (Singapore time).');
+  expect(screen.getByLabelText('New event date and time (Singapore time)')).toHaveAttribute('min', '2030-06-27T10:01');
+  expect(raise).not.toHaveBeenCalled();
+});

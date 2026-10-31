@@ -1,0 +1,270 @@
+{
+  "scope": "Actual application on isolated loopback fixture with in-memory storage; 390 px viewport; UTC browser zone; fixed clock 31 Oct 2026 12:00 SGT. Appearance evidence only; no hosted account data.",
+  "results": [
+    {
+      "name": "venue-blocks",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "block-start",
+          "width": 294,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "block-end",
+          "width": 294,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": "block-category",
+          "width": 294,
+          "paddingRight": "44px",
+          "arrow": true
+        },
+        {
+          "tag": "TEXTAREA",
+          "type": "textarea",
+          "label": "block-reason",
+          "width": 294,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "venue-holds",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": "",
+          "width": 284,
+          "paddingRight": "44px",
+          "arrow": true
+        },
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": "",
+          "width": 284,
+          "paddingRight": "44px",
+          "arrow": true
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "",
+          "width": 284,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "",
+          "width": 284,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "",
+          "width": 284,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "event-request",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "label": "rf-name",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "label": "rf-purpose",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "rf-proposed_date",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "label": "rf-expected_attendance",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "label": "rf-venue_requirements",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "label": "rf-preferred_layout",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "TEXTAREA",
+          "type": "textarea",
+          "label": "rf-description",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "TEXTAREA",
+          "type": "textarea",
+          "label": "rf-accessibility_needs",
+          "width": 262,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "TEXTAREA",
+          "type": "textarea",
+          "label": "rf-equipment_requirements",
+          "width": 262,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "change-request",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": ":r2:-field",
+          "width": 292,
+          "paddingRight": "44px",
+          "arrow": true
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": ":r2:-value",
+          "width": 292,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "TEXTAREA",
+          "type": "textarea",
+          "label": ":r2:-reason",
+          "width": 292,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "equipment-availability",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": ":r1:-start",
+          "width": 258,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": ":r1:-end",
+          "width": 258,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "equipment-reservation",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": ":r2:-start",
+          "width": 258,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": ":r2:-end",
+          "width": 258,
+          "paddingRight": "14px"
+        }
+      ]
+    },
+    {
+      "name": "venue-request",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "request-1-from",
+          "width": 278,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "INPUT",
+          "type": "datetime-local",
+          "label": "request-1-until",
+          "width": 278,
+          "paddingRight": "14px"
+        },
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": "request-1-layout",
+          "width": 278,
+          "paddingRight": "44px",
+          "arrow": true
+        }
+      ]
+    },
+    {
+      "name": "coordinator-assignment",
+      "overflow": false,
+      "targetOverflow": false,
+      "controls": [
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "label": "coordinator-71",
+          "width": 262,
+          "paddingRight": "44px",
+          "arrow": true
+        }
+      ]
+    }
+  ]
+}

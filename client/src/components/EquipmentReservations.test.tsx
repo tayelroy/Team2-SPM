@@ -89,7 +89,10 @@ test.each([
   expect(reserveEquipment).toHaveBeenCalledExactlyOnceWith(7, 11, 'token', expect.any(AbortSignal), { version: 2, starts_at: `2030-06-01T02:00:00.${expectedStart}Z`, ends_at: `2030-06-01T02:00:00.${expectedEnd}Z` });
 });
 test('[BOUNDARY] [SG2-55:AC1] explicit millisecond dates are transmitted exactly without retaining the old suggested period', async () => {
-  await form(); dates('2030-06-02T10:00:30.123', '2030-06-02T10:00:30.124'); submit(); await screen.findByText(/The assigned Event Coordinator has been notified/);
+  await form(); dates('2030-06-02T10:00:30.123', '2030-06-02T10:00:30.124');
+  expect(screen.getByLabelText('Reserve until (Singapore time)')).toHaveAttribute('min', '2030-06-02T10:00:30.124');
+  expect((screen.getByLabelText('Reserve until (Singapore time)') as HTMLInputElement).checkValidity()).toBe(true);
+  submit(); await screen.findByText(/The assigned Event Coordinator has been notified/);
   expect(reserveEquipment).toHaveBeenCalledExactlyOnceWith(7, 11, 'token', expect.any(AbortSignal), { version: 2, starts_at: '2030-06-02T02:00:30.123Z', ends_at: '2030-06-02T02:00:30.124Z' });
 });
 test.each([new EquipmentAvailabilityError(503), new Error('Private availability failure')])('[FAILURE] [SG2-55:AC1] unavailable advisory still allows explicit dates with the final server stock check', async failure => {

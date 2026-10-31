@@ -159,7 +159,6 @@ test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC1] an invalid period, missing reason or 
     ['2030-07-01T09:00', '2030-07-01T09:00', 'Reason'],
     ['2026-10-01T07:59', '2026-10-01T08:00', 'Reason'],
     ['2020-07-01T09:00', '2020-07-01T17:00', 'Reason'],
-    ['2026-10-01T07:59', '2030-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '2030-07-01T17:00', '   '],
     ['2030-07-01T09:00', '2030-07-01T17:00', 'x'.repeat(501)],
     ['2030-07-01T09:00', '2030-07-01T17:00', 'Reason', '']
@@ -235,3 +234,13 @@ test('[CONFLICT] [SG2-45:block-isolation] leaving mid-save aborts the request wi
 });
 
 afterAll(() => vi.unstubAllEnvs());
+
+
+test('[NORMAL] [SG2-45:AC1] [SG2-80:AC1] an ongoing block with a future end matches the server contract', async () => {
+  const { fetch } = await openBlocks();
+  await screen.findByText(/No upcoming blocks/);
+  expect(screen.getByLabelText('Unavailable from (Singapore time)')).not.toHaveAttribute('min');
+  fillBlock('2026-10-01T07:59', '2026-10-01T09:00', 'Ongoing maintenance');
+  expect(await screen.findByRole('listitem', { name: 'Ongoing maintenance' })).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({ method: 'POST', body: JSON.stringify({ starts_at: '2026-09-30T23:59:00.000Z', ends_at: '2026-10-01T01:00:00.000Z', category: 'maintenance', reason: 'Ongoing maintenance' }) }));
+});

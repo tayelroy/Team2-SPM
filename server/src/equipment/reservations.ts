@@ -58,6 +58,9 @@ export function createEquipmentReservationsRouter(access: ReturnType<typeof crea
         if (start === null || end === null || end <= start) {
           res.status(400).json({ error: 'Choose a complete time period with a time zone and an end after its start.' }); return;
         }
+        if (start <= Date.now()) {
+          res.status(400).json({ error: 'Choose a reservation start in the future.' }); return;
+        }
         period = { starts_at: new Date(start).toISOString(), ends_at: new Date(end).toISOString() };
       }
       const result = await store(req.get('authorization')!.slice(7)).run(action, eventId, requestId, version, period);

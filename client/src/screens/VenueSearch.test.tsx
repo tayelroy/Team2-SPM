@@ -611,7 +611,7 @@ test('[BOUNDARY] [SG2-46:AC2] Singapore minimums and submit guards reject past s
     expect(from).toHaveAttribute('min', '2026-11-01T00:31');
     fill({ 'From (Singapore time)': '2026-11-01T00:30', 'Until (Singapore time)': '2026-11-01T01:30' });
     fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('future period');
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a future period that starts before it ends.');
     expect(fetch).not.toHaveBeenCalled();
     fill({ 'From (Singapore time)': '2026-11-01T00:31' });
     expect(until).toHaveAttribute('min', '2026-11-01T00:32');

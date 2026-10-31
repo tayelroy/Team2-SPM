@@ -1,4 +1,4 @@
-import { futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
+import { endMinimum, futureSgtMinute, isFuturePeriod } from '../utils/futureDates';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { EquipmentReservationsError, loadEquipmentReservations, reserveEquipment, type ReservationsView } from '../api/equipmentReservations';
 import { EquipmentAvailabilityError, loadEquipmentAvailability, type AvailabilityReady } from '../api/equipmentAvailability';
@@ -132,7 +132,7 @@ function ReservationForm({ eventId, token, record, onSaved, onCancel, onRefresh,
     <form aria-label={`Reserve equipment: ${record.equipment_type}`} onSubmit={submit} noValidate>
       <fieldset disabled={checking || saving || conflict} style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', border: 0, margin: 0, padding: 0, minWidth: 0 }}>
         <label htmlFor={`${id}-start`} style={fieldStyle}>Reserve from (Singapore time)<input id={`${id}-start`} type="datetime-local" min={futureSgtMinute()} step={inputStep(start)} required value={start} onChange={event => { setStart(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
-        <label htmlFor={`${id}-end`} style={fieldStyle}>Reserve until (Singapore time)<input id={`${id}-end`} type="datetime-local" min={Date.parse(`${start}+08:00`) > Date.now() ? start : futureSgtMinute()} step={inputStep(end)} required value={end} onChange={event => { setEnd(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
+        <label htmlFor={`${id}-end`} style={fieldStyle}>Reserve until (Singapore time)<input id={`${id}-end`} type="datetime-local" min={endMinimum(start, Date.now(), inputStep(end) ? 'millisecond' : 'minute')} step={inputStep(end)} required value={end} onChange={event => { setEnd(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
       </fieldset>
       {error ? <p role="alert">{error}</p> : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>
