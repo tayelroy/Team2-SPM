@@ -7734,12 +7734,13 @@
     "purpose": "Prove preference save and reload use the real HTTP route.",
     "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
     "steps": [
-      "Open coordinator inbox; assert default1 day.",
-      "Set30, save and assert success plus exact persisted current-user preference.",
-      "Reload; reopen and assert30 remains."
+      "Sign in as the coordinator and click the header Notifications bell; find Reminder frequency (days) at the bottom of the panel, not Profile. Assert the reset fixture defaults to 1 day.",
+      "Set 30 and Save reminder frequency; assert the saved confirmation and exactly the current user's persisted preference.",
+      "Reload and reopen Notifications; assert 30 remains.",
+      "Enter 31; assert Save is disabled and the native input reports range overflow. Press Enter, reload/reopen and assert 30 remains stored. Assert the only preference write contained 30."
     ],
     "data": "Coordinator user-coordinator, frequency1 default and30 maximum.",
-    "expected": "One exact current-user setting30; reload displays30. This browser case seeds a reminder; it does not prove scheduler delivery.",
+    "expected": "Daily default 1; 30 saves and persists across reload. 31 is refused without an additional preference write, and 30 remains after a second reload. This browser case does not prove scheduler delivery or stopping.",
     "evidence": "e2e/notification-inbox.spec.ts",
     "layer": "Playwright browser + fixture API",
     "previous_executions": [
@@ -7759,7 +7760,8 @@
         "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
         "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
       }
-    ]
+    ],
+    "notes": " 31 Oct 2026: walkthrough 5.3 corrected to Notifications. P02 now additionally covers refusal of 31 and preservation of 30; prior execution records refer to their original assertions."
   },
   {
     "story": "SG2-69",
@@ -10405,5 +10407,30 @@
     "status": "Pass",
     "execution_date": "29 Oct 2026",
     "actual": "Passed the 1440px browser regression with real captures for all six states."
+  },
+  {
+    "id": "SG2-106-B02",
+    "title": "Expiry pickers enforce the next future Singapore-time minute",
+    "type": "BOUNDARY",
+    "story": "SG2-106",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC3"
+    ],
+    "purpose": "Prevent past/current-minute expiry choices in both creation and change-expiry forms, including Singapore midnight and a page left open.",
+    "preconditions": "Rendered VenueHolds component, public mocked API boundary, browser timezone UTC, controlled clock.",
+    "steps": [
+      "At 2030-06-12T16:00:30Z open both expiry fields. Assert the previous Singapore day and current minute are range-underflow invalid; 13 June 00:01 SGT is valid.",
+      "Advance an open form from 09:00 to 09:01 SGT; assert 09:01 is now invalid and 09:02 remains valid."
+    ],
+    "data": "Singapore time UTC+8, minute-precision inputs; no hosted data.",
+    "expected": "Both native expiry inputs exclude non-future minutes and advance their minimum while open. Existing submit-time and backend checks remain active.",
+    "evidence": "client/src/screens/VenueHolds.test.tsx",
+    "layer": "Rendered component with controlled API/clock",
+    "status": "Pass (local component coverage)",
+    "actual": "31 Oct 2026: both new rendered-input boundary tests pass in the 1826-test frontend coverage run; all four coverage metrics are 100%. Hosted deployment and independent teammate sign-off remain pending.",
+    "review": null
   }
 ]

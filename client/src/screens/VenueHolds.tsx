@@ -6,6 +6,9 @@ import { sgtToMs } from '../venues/searchApi';
 const EMPTY = { event: '', venue: '', start: '', end: '', expiry: '' };
 const LABELS = { tentative: 'Tentative', converted: 'Converted to booking', released: 'Released', expired: 'Expired' };
 const formatter = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore', hour12: false });
+// datetime-local has minute precision and these fields are explicitly SGT,
+// regardless of the browser's own time zone. The current minute is not future.
+const nextExpiryMinute = () => new Date((Math.floor(Date.now() / 60_000) + 1) * 60_000 + 8 * 60 * 60_000).toISOString().slice(0, 16);
 
 /** SG2-84/85: persisted venue holds. Staff place, release and approve;
  * coordinators read only their assigned events. The API enforces both scopes. */
@@ -23,6 +26,13 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
   // SG2-106: the hold whose expiry is being changed, with the typed SGT value.
   const [expiry, setExpiry] = useState<{ holdId: number; value: string } | null>(null);
   const busy = useRef(false);
+  const [expiryMinimum, setExpiryMinimum] = useState(nextExpiryMinute);
+
+  useEffect(() => {
+    if (!staff) return;
+    const timer = window.setInterval(() => setExpiryMinimum(nextExpiryMinute()), 1000);
+    return () => window.clearInterval(timer);
+  }, [staff]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -116,7 +126,7 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
             </select></label>
             <label>Period starts (Singapore time)<input required type="datetime-local" value={form.start} onChange={event => setForm(previous => ({ ...previous, start: event.target.value }))} /></label>
             <label>Period ends (Singapore time)<input required type="datetime-local" value={form.end} onChange={event => setForm(previous => ({ ...previous, end: event.target.value }))} /></label>
-            <label>Hold expires (Singapore time)<input required type="datetime-local" value={form.expiry} onChange={event => setForm(previous => ({ ...previous, expiry: event.target.value }))} /></label>
+            <label>Hold expires (Singapore time)<input required type="datetime-local" min={expiryMinimum} value={form.expiry} onChange={event => setForm(previous => ({ ...previous, expiry: event.target.value }))} /></label>
           </div>
           <button type="submit" className="organisation-button organisation-button-primary" disabled={pending}>{pending ? 'Placing hold…' : 'Place hold'}</button>
         </form> : <p>No eligible events or venues. An approved or planning event needs an assigned Event Coordinator before a hold can be placed.</p>)}
@@ -142,7 +152,7 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
               </div>
               {expiry?.holdId === hold.hold_id && <form aria-label={`Change expiry for hold #${hold.hold_id}`} onSubmit={event => moveExpiry(event, hold)}>
                 <div className="venue-hold-fields">
-                  <label>New expiry (Singapore time)<input required type="datetime-local" value={expiry.value}
+                  <label>New expiry (Singapore time)<input required type="datetime-local" min={expiryMinimum} value={expiry.value}
                     onChange={event => setExpiry({ holdId: hold.hold_id, value: event.target.value })} /></label>
                 </div>
                 <div className="venue-hold-actions">
