@@ -407,3 +407,11 @@ test('[BOUNDARY] [SG2-42:AC1] existing Supabase records with null fields can be 
   expect(screen.getByText('80')).toBeInTheDocument();
   expect(screen.queryByText('Not recorded')).not.toBeInTheDocument();
 });
+
+test('[FAILURE] [SG2-42:AC1] Capacity drops e, +, - and . keystrokes while text fields keep them', () => {
+  render(<VenueForm venue={null} saving={false} error="" onSave={vi.fn()} onCancel={vi.fn()} />);
+  const field = screen.getByLabelText('Capacity');
+  for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+  expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+  expect(fireEvent.keyDown(screen.getByLabelText('Venue name'), { key: 'e' })).toBe(true);
+});

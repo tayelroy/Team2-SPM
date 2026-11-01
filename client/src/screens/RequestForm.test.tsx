@@ -108,7 +108,8 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     '[BOUNDARY] [SG2-30:AC2] submit stays disabled when %s is the only blank required field', (label) => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
-    fireEvent.change(screen.getByLabelText(new RegExp(label, 'i')), { target: { value: '   ' } });
+    // Attendance takes digits only, so it is blanked rather than filled with spaces.
+    fireEvent.change(screen.getByLabelText(new RegExp(label, 'i')), { target: { value: label === 'Expected attendance' ? '' : '   ' } });
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
@@ -316,12 +317,13 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(sentDraftBody(fetchMock).accessibility_needs).toBe('Hearing loop');
   });
 
-  test('[FAILURE] [SG2-28:AC4] drops a non-numeric attendance rather than sending it', async () => {
+  test('[FAILURE] [SG2-28:AC4] ignores non-digit attendance input rather than sending it', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: 'many' } });
+    expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByText(/Draft 12 saved/);
 

@@ -149,6 +149,10 @@ test.each(['1', '2147483647'])('[BOUNDARY] [SG2-53:AC3] positive inclusive quant
 test.each(['', '0', '-1', '1.5', '1e3', '2147483648'])('[FAILURE] [BOUNDARY] [SG2-53:AC3] quantity %s is rejected without dispatch', async quantity => {
   await requestForm(); fillRequirement(quantity); submit(); expect(screen.getByRole('alert')).toHaveTextContent('whole-number quantity from 1'); expect(saveEquipmentRequirement).not.toHaveBeenCalled();
 });
+test.each(['dasdd', '12a', '-1', '1.5'])('[FAILURE] [SG2-53:AC3] quantity keystrokes %s other than digits are ignored', async typed => {
+  await requestForm(); change('Quantity required', '7'); change('Quantity required', typed);
+  expect(screen.getByLabelText('Quantity required')).toHaveValue('7');
+});
 test('[FAILURE] [SG2-53:AC1] missing equipment and excessive notes remain editable and clearing validation permits dispatch', async () => {
   await requestForm(); submit(); expect(screen.getByRole('alert')).toBeVisible(); expect(saveEquipmentRequirement).not.toHaveBeenCalled();
   fillRequirement('5', 'x'.repeat(2001)); submit(); expect(saveEquipmentRequirement).not.toHaveBeenCalled();
@@ -175,13 +179,17 @@ test('[BOUNDARY] [SG2-53:AC5] [SG2-53:AC6] total shortfall and the exact Unicode
   expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { shortfall: 4, arrangement_notes: '🎤'.repeat(2000), placement_venue_id: 9, placement_position: '席'.repeat(2000) }, record);
 });
 test.each([
-  ['Shortfall quantity', ''], ['Shortfall quantity', '-1'], ['Shortfall quantity', '0.5'], ['Shortfall quantity', '5'],
+  ['Shortfall quantity', ''], ['Shortfall quantity', '5'],
   ['Arrangement notes', 'x'.repeat(2001)], ['Placement position', 'x'.repeat(2001)],
   ['Placement position', 'Position without venue'], ['Placement venue', '9'],
 ])('[FAILURE] [BOUNDARY] [SG2-53:AC5] [SG2-53:AC6] invalid %s is refused and can be corrected', async (field, value) => {
   await arrangementForm(); change('Shortfall quantity', '0'); change(field, value); submit('Update equipment arrangement');
   expect(screen.getByRole('alert')).toHaveTextContent('both placement fields or neither'); expect(saveEquipmentArrangement).not.toHaveBeenCalled();
   change('Shortfall quantity', '0'); change('Arrangement notes', ''); change('Placement venue', ''); change('Placement position', ''); submit('Update equipment arrangement'); await screen.findByText('Equipment arrangement saved.');
+});
+test.each(['abc', '-1', '0.5'])('[FAILURE] [SG2-53:AC5] shortfall keystrokes %s other than digits are ignored', async typed => {
+  await arrangementForm(); change('Shortfall quantity', '2'); change('Shortfall quantity', typed);
+  expect(screen.getByLabelText('Shortfall quantity')).toHaveValue('2');
 });
 test('[NORMAL] [SG2-53:AC6] the placement venue choices are exactly the venues the event has requested or booked', async () => {
   await open({ ...view, can_request: false, can_arrange: true, venues: [{ venue_id: 9, name: 'Main hall' }, { venue_id: 12, name: 'Annex' }] });

@@ -6,6 +6,7 @@ import {
 import { Card, Fact, GhostButton, GradientButton } from '../ui';
 import { color, label, rule } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
+import { digitsOnly } from '../digitsOnly';
 import EquipmentAvailability from './EquipmentAvailability';
 import EquipmentReservations from './EquipmentReservations';
 
@@ -157,7 +158,7 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
         {arranging ? <>
           <p style={{ margin: 0 }}>Arranging {record!.quantity} × {record!.equipment_type}</p>
           <label htmlFor={`${id}-arrangement`} style={fieldStyle}>Arrangement notes<textarea id={`${id}-arrangement`} rows={3} style={inputStyle} value={arrangement} onChange={event => setArrangement(event.target.value)} /></label>
-          <label htmlFor={`${id}-shortfall`} style={fieldStyle}>Shortfall quantity<input id={`${id}-shortfall`} required inputMode="numeric" style={inputStyle} value={shortfallValue} disabled={fullyReserved} onChange={event => setShortfall(event.target.value)} /></label>
+          <label htmlFor={`${id}-shortfall`} style={fieldStyle}>Shortfall quantity<input id={`${id}-shortfall`} required inputMode="numeric" pattern="[0-9]*" style={inputStyle} value={shortfallValue} disabled={fullyReserved} onChange={event => { if (digitsOnly(event.target.value)) setShortfall(event.target.value); }} /></label>
           <p style={{ margin: 0, color: color.silver }}>{fullyReserved ? 'This requirement is fully reserved. Shortfall stays at 0; you can still update notes and placement.' : 'Enter 0 when the requirement is fully covered. The shortfall cannot exceed the quantity requested.'}</p>
           <label htmlFor={`${id}-venue`} style={fieldStyle}>Placement venue<select id={`${id}-venue`} style={inputStyle} value={venue} onChange={event => setVenue(event.target.value)}>
             <option value="">Not recorded</option>{view.venues.map(item => <option key={item.venue_id} value={item.venue_id}>{item.name}</option>)}
@@ -169,7 +170,7 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
           <label htmlFor={`${id}-equipment`} style={fieldStyle}>Equipment type<select id={`${id}-equipment`} required style={inputStyle} value={equipment} onChange={event => setEquipment(event.target.value)}>
             <option value="">Choose equipment</option>{view.equipment.map(item => <option key={item.equipment_id} value={item.equipment_id}>{item.type}</option>)}
           </select></label>
-          <label htmlFor={`${id}-quantity`} style={fieldStyle}>Quantity required<input id={`${id}-quantity`} required inputMode="numeric" style={inputStyle} value={quantity} onChange={event => setQuantity(event.target.value)} /></label>
+          <label htmlFor={`${id}-quantity`} style={fieldStyle}>Quantity required<input id={`${id}-quantity`} required inputMode="numeric" pattern="[0-9]*" style={inputStyle} value={quantity} onChange={event => { if (digitsOnly(event.target.value)) setQuantity(event.target.value); }} /></label>
           <label htmlFor={`${id}-notes`} style={fieldStyle}>Technical notes<textarea id={`${id}-notes`} rows={3} style={inputStyle} value={notes} onChange={event => setNotes(event.target.value)} /></label>
           {record ? <p>Saving changes clears the previous arrangement update, shortfall and placement. Technical Support must recheck the amended requirement.</p> : null}
         </>}

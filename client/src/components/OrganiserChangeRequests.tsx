@@ -7,6 +7,7 @@ import {
   type OwnChangeRequest,
 } from '../api/changeRequests';
 import { formatSgtTimestamp } from './EventAuditDrawer';
+import { blockNonDigitKeys } from '../digitsOnly';
 
 export interface OrganiserChangeRequestsProps {
   eventId: number;
@@ -108,6 +109,7 @@ export default function OrganiserChangeRequests({ eventId, accessToken }: Organi
       id={valueId}
       type={chosen.input === 'datetime' ? 'datetime-local' : chosen.input}
       min={chosen.input === 'number' ? 1 : chosen.input === 'datetime' ? futureSgtMinute() : undefined}
+      onKeyDown={chosen.input === 'number' ? blockNonDigitKeys : undefined}
       value={value}
       onChange={(event) => setValue(event.target.value)}
       className="organisation-textarea"

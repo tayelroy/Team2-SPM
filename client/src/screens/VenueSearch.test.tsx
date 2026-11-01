@@ -631,3 +631,10 @@ test('[BOUNDARY] [SG2-46:AC2] an expired event prefill is rejected before the au
     expect(fetch).not.toHaveBeenCalled();
   } finally { clock.mockRestore(); }
 });
+
+test('[FAILURE] [SG2-46:AC2] Attendance drops e, +, - and . keystrokes and keeps digits', () => {
+  render(<VenueSearch accessToken="token" />);
+  const field = screen.getByLabelText('Attendance');
+  for (const key of ['e', '+', '-', '.']) expect(fireEvent.keyDown(field, { key })).toBe(false);
+  expect(fireEvent.keyDown(field, { key: '5' })).toBe(true);
+});
