@@ -1,15 +1,15 @@
-# ConnectSphere API specification — PR90 capacity and draft-history revision (16 Oct 2026)
+# ConnectSphere API specification — Sprint 4 revision (main `4881413`, 3 Nov 2026)
 
 SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at the documented snapshot. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
-- **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching, SG2-47 capacity discovery and SG2-40 atomic draft-history corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity and draft-history revision, not a claim of hosted acceptance or peer approval.
-- **Endpoint count:** 74 method + path pairs, from 71 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
+- **Revision scope:** the whole Sprint 4 surface on `main` at `4881413` (3 Nov 2026), all 23 Sprint 4 stories merged. It supersedes the PR90 capacity and draft-history revision (baseline head `61416cc`, 16 Oct 2026). Registration (SG2-59 to SG2-63), cancellation (SG2-67), change requests (SG2-64 to SG2-66), the safety desk (SG2-91 to SG2-94), cross-system search (SG2-70), Lead oversight (SG2-89), the notification inbox (SG2-69), multi-role accounts (SG2-104), venue delete and hold expiry (SG2-106) and the other additions since the baseline are now in §2 and the sections below. Source line numbers quoted in §3 to §10 come from the earlier baseline and may have moved; the source filenames identify the code. This specification describes the code on `main`, not a claim of hosted acceptance or peer approval.
+- **Endpoint count:** 108 method + path pairs, from 105 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
 - **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
 ## Contents
 1. [Conventions](#1-conventions)
-2. [Endpoint index](#2-endpoint-index) (all 74, one row each)
+2. [Endpoint index](#2-endpoint-index) (all 108, one row each)
 3. [Auth, accounts and profile](#3-auth-accounts-and-profile)
 4. [Event requests](#4-event-requests)
 5. [Queues and notifications](#5-queues-and-notifications)
@@ -17,8 +17,10 @@ SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at 
 7. [Venue booking requests](#7-venue-booking-requests)
 8. [Venue holds, bookings and clashes](#8-venue-holds-bookings-and-clashes)
 9. [Equipment](#9-equipment)
+9A. [Event search](#9a-event-search-sg2-70)
+9B. [Events open for registration](#9b-events-open-for-registration-sg2-59)
 10. [Health](#10-health)
-11. [Week 7 work with no endpoint yet («planned»)](#11-week-7-work-with-no-endpoint-yet-planned)
+11. [Work still without an endpoint](#11-work-still-without-an-endpoint)
 12. [Doc vs code](#doc-vs-code)
 13. [How the route list was verified](#how-the-route-list-was-verified)
 
@@ -29,10 +31,15 @@ SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at 
 ### Transport and authentication
 - **Format:** JSON request and response bodies; `express.json()` is applied globally. A malformed JSON body gets Express's default 400 response, because `app.ts` has no custom error handler.
 - **Authentication:** every endpoint except login, logout and health needs `Authorization: Bearer <Supabase access token>`. Two pieces of middleware in `server/src/auth/index.ts` enforce this:
-  - **`requireAuth`.** Checks there is exactly one well-formed Bearer header, verifies the token with Supabase Auth `getUser`, then reads the caller's role from `public.account_roles`. Neither the token claims nor the request body decide the role. It stores `{ userId, role }` on the request and sets `Cache-Control: no-store`.
+  - **`requireAuth`.** Checks there is exactly one well-formed Bearer header, verifies the token with Supabase Auth `getUser`, then reads **every** role the caller holds from `public.account_roles` (SG2-104) and picks the acting role (see [Acting role](#acting-role-sg2-104)). Neither the token claims nor the request body decide the roles. It stores `{ userId, role, roles }` on the request and sets `Cache-Control: no-store`.
   - **`requirePermission(action)`.** Checks `PERMISSIONS[action]` in `policy.ts` against that role. An action with no grant is denied.
 - **`protectedRouter()`** is an Express `Router` with `router.use(requireAuth)`. Most routers are built this way, so a request entering one is authenticated even when no route in it matches.
   - **Exception:** the equipment-reservations router (`equipment/reservations.ts`) is a plain `Router` mounted at `/api`. It attaches `requireAuth` to each of its two routes, so it does not intercept other `/api/*` paths.
+
+### Acting role (SG2-104)
+- An account may hold several roles, but each request runs as exactly one: the **acting role**. The client names it in the `X-Acting-Role` header (`server/src/auth/actingRole.ts`). The server checks that the account holds it, then evaluates the request, its permissions and its database calls (the header is forwarded to PostgREST, where `public.acting_role()` and `lock_acting_role()` check it against the caller's own `account_roles` rows) as that role only.
+- **No header:** a single-role account acts as its role; a multi-role account acts as its least-privileged role, in the order `attendee`, `event_organiser`, `safety_officer`, `event_coordinator_lead`, `event_coordinator`, `venue_staff`, `technical_support_staff`.
+- **Refusals:** more than one `X-Acting-Role` header, or a value that is not one of the seven role codes, is 400 `{ error: "Invalid acting role", code: "invalid_acting_role" }`; a real role the account does not hold is 403 `{ error: "You do not hold that role", code: "role_not_held" }`.
 
 ### Errors common to every protected endpoint
 These are not repeated per endpoint.
@@ -40,8 +47,9 @@ These are not repeated per endpoint.
 | Status | Body | When |
 |---|---|---|
 | 401 | `{ "error": "Authentication required" }` + `WWW-Authenticate: Bearer` | Missing, malformed or duplicate Bearer header, or token rejected by Supabase Auth |
-| 403 | `{ "error": "Access denied" }` | Account has no known role in `account_roles`, or the role lacks the endpoint's permission |
+| 403 | `{ "error": "Access denied" }` | Account has no known role in `account_roles`, or the acting role lacks the endpoint's permission |
 | 503 | `{ "error": "Access service unavailable" }` | Supabase not configured over HTTPS, or the Auth / role lookup failed |
+| 400 / 403 | `{ "error": "Invalid acting role" \| "You do not hold that role", "code": "invalid_acting_role" \| "role_not_held" }` | The `X-Acting-Role` header is malformed or names a role the account does not hold (see [Acting role](#acting-role-sg2-104)) |
 
 Other conventions:
 - **Handler errors** are `{ "error": string }`. Some add fields, e.g. `details[]`, `code`, `missing[]`, `conflict` or `outstanding[]`; these are noted per endpoint.
@@ -73,8 +81,8 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 |---|---|---|---|---|---|---|
 | 1 | POST | `/api/auth/login` | public (rate-limited) | anyone | — | [3.1](#31-post-apiauthlogin) |
 | 2 | POST | `/api/auth/logout` | public | anyone | — | [3.2](#32-post-apiauthlogout) |
-| 3 | GET | `/api/auth/me` | authenticated (no permission key) | all 7 | — (ECL/SO valid since SG2-86) | [3.3](#33-get-apiauthme) |
-| 4 | PATCH | `/api/users/:userId/role` | `users.role.update` | TSS | — (accepts the two W7 roles since SG2-86) | [3.4](#34-patch-apiusersuseridrole) |
+| 3 | GET | `/api/auth/me` | authenticated (no permission key) | all 7 | — (ECL/SO valid since SG2-86; `roles` since SG2-104) | [3.3](#33-get-apiauthme) |
+| 4 | PATCH | `/api/users/:userId/role` | `users.role.update` | TSS | — (accepts the two W7 roles since SG2-86; replaces all held roles, SG2-104) | [3.4](#34-patch-apiusersuseridrole) |
 | 5 | GET | `/api/profile` | `profile.read` | all 7 | — | [3.5](#35-get-apiprofile) |
 | 6 | PUT | `/api/profile` | `profile.update` | all 7 | — | [3.6](#36-put-apiprofile) |
 | 7 | POST | `/api/event-requests` | `event_request.create` | EO | — | [4.1](#41-post-apievent-requests) |
@@ -128,7 +136,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 55 | POST | `/api/venue-holds/:holdId/release` | `venues.holds.manage` | VS | W7 #4 — SG2-84 | [8.5](#85-post-apivenue-holdsholdidrelease) |
 | 56 | POST | `/api/venue-holds/:holdId/convert` | `venues.holds.manage` | VS | W7 #4 — SG2-84/85; W7 #1 — SG2-78 | [8.6](#86-post-apivenue-holdsholdidconvert) |
 | 57 | GET | `/api/venue-bookings` | `venue_bookings.view` (+ `venue_bookings.by_venue` for `?venue_id`) | VS, EC (by venue: VS) | New since W7 — SG2-51 | [8.7](#87-get-apivenue-bookings) |
-| 58 | POST | `/api/venue-bookings/:bookingId/release` | `venue_bookings.release` | VS, EC | New since W7 — SG2-51; W7 #3 — SG2-82 | [8.8](#88-post-apivenue-bookingsbookingidrelease) |
+| 58 | POST | `/api/venue-bookings/:bookingId/release` | `venue_bookings.release` | EC (VS until SG2-83) | New since W7 — SG2-51; W7 #3 — SG2-82, SG2-83 | [8.8](#88-post-apivenue-bookingsbookingidrelease) |
 | 59 | GET | `/api/venue-clashes` | `venue_clashes.view` | VS, EC | W7 #1 — SG2-79 | [8.9](#89-get-apivenue-clashes) |
 | 60 | GET | `/api/equipment` | `equipment.read` | TSS | New since W7 — SG2-52 | [9.1](#91-get-apiequipment) |
 | 61 | POST | `/api/equipment` | `equipment.create` | TSS | New since W7 — SG2-52 | [9.2](#92-post-apiequipment) |
@@ -144,25 +152,61 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 71 | GET | `/api/health` | public | anyone | — | [10.1](#101-get-health-and-get-apihealth) |
 | 72 | GET | `/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
 | 73 | GET | `/api/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
-
 | 74 | GET | `/api/venue-booking-requests/capacity-exceptions` | `venue_booking.capacity_exception.approve` | VS | SG2-47 reachability repair; SG2-66 AC2/AC5 | [7.8](#78-get-apivenue-booking-requestscapacity-exceptions) |
+| 75 | GET | `/api/event-requests/:eventId/registrations` | `event_request.registrations.view` | EO, EC | Sprint 4 — SG2-63 (waiting list: SG2-61) | [4.13a](#413a-sg2-63-registration-picture-and-settings) |
+| 76 | PATCH | `/api/event-requests/:eventId/registration-settings` | `event_request.registration_settings.update` | EO | Sprint 4 — SG2-63 | [4.13a](#413a-sg2-63-registration-picture-and-settings) |
+| 77 | POST | `/api/event-requests/:eventId/registration-settings/close` | `event_request.registration_settings.update` | EO | Sprint 4 — SG2-63 | [4.13a](#413a-sg2-63-registration-picture-and-settings) |
+| 78 | POST | `/api/event-requests/:eventId/cancellation-request` | `event_request.cancellation.request` | EO | Sprint 4 — SG2-67 | [4.20](#420-post-apievent-requestseventidcancellation-request) |
+| 79 | PATCH | `/api/event-requests/:eventId/cancel` | `event_request.cancel` | EC | Sprint 4 — SG2-67; equipment released by SG2-56 | [4.21](#421-patch-apievent-requestseventidcancel) |
+| 80 | POST | `/api/event-requests/:eventId/change-requests` | `event_request.change_request.raise` | EO | Sprint 4 — SG2-64 | [4.22](#422-post-and-get-apievent-requestseventidchange-requests) |
+| 81 | GET | `/api/event-requests/:eventId/change-requests` | `event_request.change_request.view` | EC, EO | Sprint 4 — SG2-64 (organiser), SG2-66 (coordinator) | [4.22](#422-post-and-get-apievent-requestseventidchange-requests) |
+| 82 | POST | `/api/event-requests/:eventId/change-requests/:changeRequestId/accept` | `event_request.change_request.accept` | EC | Sprint 4 — SG2-66, SG2-65 | [4.23](#423-post-apievent-requestseventidchange-requestschangerequestidaccept) |
+| 83 | POST | `/api/event-requests/:eventId/change-requests/:changeRequestId/refuse` | `event_request.change_request.refuse` | EC | Sprint 4 — SG2-65 | [4.24](#424-post-apievent-requestseventidchange-requestschangerequestidrefuse) |
+| 84 | POST | `/api/event-requests/:eventId/rechecks/:key/settle` | `event_request.rechecks.settle` | EC | Sprint 4 — SG2-66; safety keys SG2-93 | [4.25](#425-post-apievent-requestseventidrecheckskeysettle) |
+| 85 | POST | `/api/event-requests/:eventId/safety-decision` | `event_request.safety_decision.record` | SO | W7 #6 — SG2-92, SG2-93 | [4.26](#426-post-apievent-requestseventidsafety-decision) |
+| 86 | GET | `/api/event-requests/:eventId/safety-decisions` | `event_request.safety_decisions.view` | SO, EC, EO | W7 #6 — SG2-92, SG2-93 | [4.27](#427-get-apievent-requestseventidsafety-decisions) |
+| 87 | POST | `/api/event-requests/:eventId/rework` | `event_request.safety_rework` | EC | W7 #6 — SG2-92 | [4.28](#428-post-apievent-requestseventidrework) |
+| 88 | GET | `/api/coordinator-overview` | `event_request.oversight.view` | ECL | W7 #5 — SG2-89 | [5.4](#54-get-apicoordinator-overview) |
+| 89 | GET | `/api/safety-checks` | `safety_checks.read` | SO | W7 #6 — SG2-91 | [5.5](#55-get-apisafety-checks) |
+| 90 | GET | `/api/safety-rereviews` | `safety_rereviews.read` | VS, TSS | W7 #6 — SG2-93 | [5.6](#56-get-apisafety-rereviews) |
+| 91 | POST | `/api/safety-rereviews/:reviewId/confirm` | `safety_rereviews.confirm` | VS, TSS | W7 #6 — SG2-93 | [5.7](#57-post-apisafety-rereviewsreviewidconfirm) |
+| 92 | GET | `/api/notifications/inbox` | `notifications.inbox` | all 7 | Sprint 4 — SG2-69 | [5.8](#58-get-apinotificationsinbox) |
+| 93 | POST | `/api/notifications/read-all` | `notifications.inbox` | all 7 | Sprint 4 — SG2-69 | [5.9](#59-post-apinotificationsread-all) |
+| 94 | GET | `/api/notifications/reminder-preferences` | `notifications.reminders.manage` | EC | Sprint 4 — SG2-69 | [5.10](#510-get-and-put-apinotificationsreminder-preferences) |
+| 95 | PUT | `/api/notifications/reminder-preferences` | `notifications.reminders.manage` | EC | Sprint 4 — SG2-69 | [5.10](#510-get-and-put-apinotificationsreminder-preferences) |
+| 96 | POST | `/api/notifications/:source/:id/read` | `notifications.inbox` | all 7 | Sprint 4 — SG2-69 | [5.11](#511-post-apinotificationssourceidread) |
+| 97 | GET | `/api/notifications/:source/:id/event` | `notifications.inbox` | all 7 | Sprint 4 — SG2-69 | [5.12](#512-get-apinotificationssourceidevent) |
+| 98 | DELETE | `/api/venues/:venueId` | `venues.delete` | VS | Sprint 4 — SG2-106 | [6.3a](#63a-delete-apivenuesvenueid) |
+| 99 | POST | `/api/venue-holds/:holdId/expiry` | `venues.holds.manage` | VS | W7 #4 — SG2-106 | [8.6a](#86a-post-apivenue-holdsholdidexpiry) |
+| 100 | GET | `/api/event-search` | `events.search` | EC, VS, TSS, ECL, SO | Sprint 4 — SG2-70 | [9A.1](#9a1-get-apievent-search) |
+| 101 | GET | `/api/event-search/options` | `events.search` | EC, VS, TSS, ECL, SO | Sprint 4 — SG2-70 | [9A.2](#9a2-get-apievent-searchoptions) |
+| 102 | GET | `/api/registrable-events` | `events.registrable.read` | ATT | Sprint 4 — SG2-59 | [9B.1](#9b1-get-apiregistrable-events) |
+| 103 | GET | `/api/registrable-events/:eventId` | `events.registrable.read` | ATT | Sprint 4 — SG2-59 | [9B.2](#9b2-get-apiregistrable-eventseventid) |
+| 104 | POST | `/api/registrable-events/:eventId/registrations` | `events.register` | ATT | Sprint 4 — SG2-60 | [9B.3](#9b3-post-apiregistrable-eventseventidregistrations-sg2-60) |
+| 105 | POST | `/api/registrable-events/:eventId/waiting-list` | `events.register` | ATT | Sprint 4 — SG2-61 | [9B.6](#9b6-post-and-delete-apiregistrable-eventseventidwaiting-list-sg2-61) |
+| 106 | DELETE | `/api/registrable-events/:eventId/waiting-list` | `events.register` | ATT | Sprint 4 — SG2-61 | [9B.6](#9b6-post-and-delete-apiregistrable-eventseventidwaiting-list-sg2-61) |
+| 107 | GET | `/api/my-registrations` | `registrations.mine.read` | ATT | Sprint 4 — SG2-62 | [9B.4](#9b4-get-apimy-registrations-sg2-62) |
+| 108 | POST | `/api/my-registrations/:registrationId/withdrawal` | `registrations.withdraw` | ATT | Sprint 4 — SG2-62 | [9B.5](#9b5-post-apimy-registrationsregistrationidwithdrawal-sg2-62) |
 
 ### What each role can call today
-- **ATT:** only rows 3, 5 and 6 (`/api/auth/me`, `/api/profile`), plus the public endpoints.
+- **ATT:** rows 3, 5 and 6 (`/api/auth/me`, `/api/profile`), rows 92 to 97 other than 94 and 95 (the notification inbox; every role holds `notifications.inbox`), and rows 102 to 108 (find, register for and withdraw from events, and the waiting list), plus the public endpoints.
 - **SO (Week 7):**
   - rows 24 and 25 (stage, history)
   - rows 63 and 69 (equipment requirements and reservations, read-only)
-  - profile and me
-  - the safety check list (SG2-91), and recording and reading each event's safety decisions (SG2-92); see §11.
+  - rows 85 and 86 (record and read safety decisions) and row 89 (the safety check list)
+  - rows 100 and 101 (event search)
+  - the inbox (rows 92, 93, 96, 97), profile and me
+  - it does not hold `notifications.read` (row 29)
 - **ECL (Week 7):**
   - rows 13 and 14 (assignable, assign/reassign)
-  - row 26 (unassigned queue)
+  - row 26 (unassigned queue) and row 88 (coordinator overview)
   - rows 24, 25 and 29 (stage, history, notifications)
-  - profile and me
+  - rows 100 and 101 (event search)
+  - the inbox (rows 92, 93, 96, 97), profile and me
 
 ### Mount order that matters
 - **`/api/event-requests/assignable`** is registered before `/:eventId`. Otherwise `/:eventId` would capture `assignable` as an id.
-- **`/:eventId/complete` and `/:eventId/confirm`** are registered before `PATCH /:eventId` (`app.ts:198-213`).
+- **`/:eventId/complete`, `/:eventId/confirm`, `/:eventId/cancellation-request` and `/:eventId/cancel`** are registered before `PATCH /:eventId` (`app.ts:247-284`). `/assignable` is registered before `GET /:eventId`.
 - **`POST /api/equipment-requests/:requestId/reservation`** is matched by the reservations router mounted at `/api` (`app.ts:145`). That mount comes before the two routers at `/api/equipment-requests` (`app.ts:146-147`).
 - **Several routers share the `/api/venues` prefix:** availability, search, suitability, venues, layouts, operations and blocks. Each is a `protectedRouter`, so a request to one path runs `requireAuth` once per router it passes through.
 
@@ -174,7 +218,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 - **Source:** `app.ts:123`; `auth/login.ts`.
 - **Callers:** anyone. Rate-limited per IP to 10 attempts per 15 minutes (`express-rate-limit`, `standardHeaders`). `trust proxy` is set to 1 for Vercel.
 - **Body:** `{ email: string, password: string }`. Both must be non-empty; `email` is trimmed.
-- **200:** `{ accessToken, user: { userId, email, role } }`, where `role` is the display form, e.g. `"Event Organiser"`. No refresh token is returned.
+- **200:** `{ accessToken, user: { userId, email, role, roles } }`. `role` is the display form of the role the account starts acting as, e.g. `"Event Organiser"`: its only role, else the least-privileged one it holds (SG2-104). `roles` lists every role held, in display form. No refresh token is returned.
 - **Errors:**
   - 401 `Invalid email or password.`
   - 403 `Your account setup is incomplete. Contact support.` (no role)
@@ -194,17 +238,19 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 ### 3.3 GET /api/auth/me
 - **Source:** `app.ts:125` (`access.router`); `auth/index.ts:63-67`.
 - **Callers:** any authenticated account. There is no permission key.
-- **200:** `{ userId, role, permissions: string[] }`. `role` is the stored snake_case value; `permissions` lists every `PERMISSIONS` key granted to that role. The client uses this list to decide which actions to show.
+- **200:** `{ userId, role, roles, permissions: string[] }`. `role` is the stored snake_case acting role (the `X-Acting-Role` header, else the default); `roles` is every role the account holds (SG2-104); `permissions` lists every `PERMISSIONS` key granted to the acting role. The client uses this list to decide which actions to show.
 - **Errors:** common errors only.
 
 ### 3.4 PATCH /api/users/:userId/role
 - **Source:** `app.ts:154-156`; `auth/roles.ts`.
 - **Permission:** `users.role.update` (TSS).
-- **Body:** `{ role }`. Must be a display role name, matched exactly: `Event Organiser`, `Event Coordinator`, `Venue Staff`, `Technical Support Staff`, `Attendee`, `Event Coordinator Lead` or `Safety Officer`. It is stored in snake_case.
-- **200:** `{ message: "Role updated." }`
+- **Body:** `{ role }`. Must be a display role name, matched exactly: `Event Organiser`, `Event Coordinator`, `Venue Staff`, `Technical Support Staff`, `Attendee`, `Event Coordinator Lead` or `Safety Officer`. SG2-104: the account's **whole** role set is replaced by that one role (`auth/roles.ts`, `changeAccountRoles`); extra roles are granted in SQL.
+- **200:** `{ message: "Role updated.", roles: string[] }`, the display names now held.
 - **Errors:**
   - 400 `A target role is required.` / `Not a recognised role.`
+  - 403 `You cannot change the roles on your own account.` (separation of duties, checked in the handler and again in the database) / `Only Technical Support Staff can change roles.`
   - 404 `No account with that id.`
+  - 409 `An account must keep at least one role.`
   - 503 `Service temporarily unavailable. Please try again later.` / `Could not update the role. Please try again later.`
 - **Data:** updates `account_roles` through the service-role client. `userId` is not format-checked.
 
@@ -511,6 +557,146 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 503
 - **Rule:** an EO sees only their own events, and never `planning_notes` rows (`INTERNAL_ONLY_AUDIT_FIELDS`).
 
+### 4.20 POST /api/event-requests/:eventId/cancellation-request
+- **Week 7:** Sprint 4 — SG2-67.
+- **Source:** `app.ts:263`; `events/cancellation.ts`; `db/eventCancellation.ts`; migration `202610220002_event_cancellation.sql` (`request_event_cancellation`).
+- **Permission:** `event_request.cancellation.request` (EO).
+- **Body:** `{ reason: string }`, trimmed, not blank, at most 500 characters.
+- **201:** `{ event_id, cancellation_requested_at, coordinator_notified }`.
+- **Errors:**
+  - 400 `Give a reason for the cancellation, up to 500 characters.`
+  - 404 `Event not found.` (missing, or not created by the caller)
+  - 409 `{ error: "A completed or cancelled event cannot be cancelled, and a draft is deleted instead.", code: "closed" }` (status `draft`, `completed`, `cancelled` or `rejected`)
+  - 409 `{ error: "A cancellation has already been requested for this event.", code: "requested" }`
+  - 401/403/503 mapped from the RPC
+- **Data:** the RPC runs as the caller and rechecks the acting role with `lock_acting_role()`. It locks the event, then stores the reason, who asked and when on the event.
+- **Side effects:** one `event_audit_logs` row (`cancellation_request`); a `cancellation_requested` notice to the assigned coordinator (an event still waiting for a coordinator keeps the request for whoever is assigned). Nothing is cancelled yet; the request also shows in the coordinator's work queue (`internal_work_items.details`).
+
+### 4.21 PATCH /api/event-requests/:eventId/cancel
+- **Week 7:** Sprint 4 — SG2-67; equipment release SG2-56.
+- **Source:** `app.ts:268`; `events/cancellation.ts`; migrations `202610220002_event_cancellation.sql` (`cancel_event`), `202610210001_equipment_release.sql`.
+- **Permission:** `event_request.cancel` (EC).
+- **Body:** none.
+- **200:** `{ event_id, status: "cancelled", cancelled_at, bookings_released, attendees_notified }`.
+- **Errors:**
+  - 404 `Event not found.` (missing, another coordinator's event, or an invalid id the RPC refuses)
+  - 409 `{ error: "A completed or cancelled event cannot be cancelled, and a draft is deleted instead.", code: "closed" }` (status `completed`, `cancelled` or `rejected`)
+  - 409 `{ error: "The organiser has not asked for this event to be cancelled.", code: "not_requested" }`
+  - 400 `eventId must be a positive integer.`; 401/403/503 as 4.20
+- **Rule:** only the assigned EC, and only once the organiser has asked (4.20).
+- **Side effects (one transaction, `cancel_event`):**
+  - every held or confirmed venue booking that has not ended is cancelled (reason `Event cancelled: …`), its approved request is cancelled and a history row is written
+  - tentative holds are released and their pending requests cancelled; other pending venue and equipment requests are cancelled
+  - the status becomes `cancelled` (`cancelled_at`, `cancelled_by`; `venue_booking_id` cleared) with a history row
+  - the trigger `release_cancelled_event_equipment` releases the event's equipment reservations in the same statement (`released_at`, `released_by`, `release_reason = 'Event cancelled'`, one history row each; SG2-56)
+  - an `event_cancelled` notice to each attendee with a non-cancelled registration and to the organiser
+  - the trigger `keep_cancelled_events_cancelled` refuses any later status change (cancellation is final)
+
+### 4.22 POST and GET /api/event-requests/:eventId/change-requests
+- **Week 7:** Sprint 4 — SG2-64 (raise, organiser list), SG2-66 (coordinator list and impact).
+- **Source:** `app.ts:307-316`; `events/changeRequests.ts`; `events/changeImpact.ts`; `db/changeRequests.ts`; migration `202610260001_event_change_requests.sql` (`raise_event_change_request`). Both routes share one path.
+- **POST permission:** `event_request.change_request.raise` (EO). **GET permission:** `event_request.change_request.view` (EC, EO); the handler branches on the acting role.
+- **POST body:** `{ field, to, reason }`.
+  - `field`: one of `proposed_date`, `expected_attendance`, `venue_requirements`, `accessibility_needs`, `equipment_requirements`, `name`, `purpose`, `description`. The first five are "significant": they can invalidate arrangements.
+  - `to`: the new value, checked with the draft rules of 4.1 for that field; null is refused.
+  - `reason`: not blank, at most 1000 characters.
+- **POST 201:** `{ change_request: { id, requested_at, reason, status: "pending", changes: [{ field, label, from, to }] }, coordinator_notified }`.
+- **POST errors:**
+  - 400 `{ error: "Invalid change request", details[] }`; 400 `eventId must be a positive integer.`
+  - 403 `Access denied` (not an organiser)
+  - 404 `Event not found.` (missing or not created by the caller)
+  - 409 `{ error: "A change cannot be requested on a draft, cancelled, rejected or completed event.", status }`
+  - 409 `The event already has that value.`
+  - 503 `Change request service is temporarily unavailable. Please try again later.`
+- **POST data:** the RPC runs with the service role under the event's row lock, checks ownership, status and the current value, stores the request in `event_change_requests` and sends a `change_requested` notice to the assigned coordinator.
+- **GET as EO:** only the creating organiser; `200 { event: { event_id, status }, change_requests: [pending requests] }`; 404 `Event not found.` otherwise.
+- **GET as EC:** only the assigned coordinator; `200 { event: { event_id, status }, can_accept, next_step_required, change_requests: [{ …request, significant, impact: { requires_revalidation, outstanding_arrangements[], arrangements: [{ kind, id, label, starts_at?, ends_at?, … }] } }] }`. `can_accept` is true for `approved`, `planning`, `awaiting_safety_check`, `preparation`, `confirmed` and `needs_clarification`; `next_step_required` is true only for `needs_clarification`. The impact is recomputed from fresh venue, equipment and registration facts on every call. Another coordinator's event is 404 `Event not found.`; any other role is 403.
+
+### 4.23 POST /api/event-requests/:eventId/change-requests/:changeRequestId/accept
+- **Week 7:** Sprint 4 — SG2-66 (impact, accept), SG2-65 (decision record, clarification path).
+- **Source:** `app.ts:317`; `events/changeRequests.ts`; `db/changeImpact.ts` (`apply_accepted_event_change`); migration `202610270001_change_request_decisions.sql` (`decide_event_change_request`).
+- **Permission:** `event_request.change_request.accept` (EC); the assigned coordinator only (404 otherwise).
+- **Body:** none, except `{ next: "review" | "resubmit" }` when the event is `needs_clarification`.
+- **200:** `{ event_id, previous_status, status, returned_to_planning, arrangements_recheck_needed, outstanding_arrangements[] }`.
+- **Errors:**
+  - 400 `eventId must be a positive integer.`
+  - 400 `{ error: "Invalid change", details[] }` (the same schedule rules as 4.13)
+  - 400 `Choose whether the request goes back to review or the organiser resubmits it.`
+  - 403 `Access denied` (not a coordinator)
+  - 404 `Event not found.` / `Change request not found.`
+  - 409 `A change can only be accepted while the event is returned for clarification, Approved, in Planning, Awaiting Safety Check, in Preparation or Confirmed.`
+  - 409 `This change request has already been decided. Refresh to see the latest.`
+  - 409 `This event changed while you were deciding. Refresh and try again.`
+  - 503 `Change request service is temporarily unavailable. Please try again later.`
+- **Rule:** the impact is recomputed from fresh facts; the client is never trusted.
+- **Side effects:**
+  - the change is applied to the event with a history row per field and the arrangements it affects become outstanding (`venue_recheck`, `equipment_recheck`, `registration_recheck`)
+  - an event in `awaiting_safety_check`, `preparation` or `confirmed` with affected arrangements returns to `planning`, clears `confirmed_by`/`confirmed_at` and sends `event_returned_to_planning` notices to the organiser and coordinator (SG2-66 AC4/AC7)
+  - the decision (who, when) is stored on `event_change_requests` and a `change_accepted` notice goes to the requesting organiser
+  - on `needs_clarification` the change is written onto the request and the status becomes `under_review` (`next: "review"`) or stays `needs_clarification` (`next: "resubmit"`)
+  - if the event's start or confirmed venues change, every attendee with an active registration gets one `event_changed` notice at commit (SG2-102, migration `202610270002_attendee_event_change_notices.sql`)
+
+### 4.24 POST /api/event-requests/:eventId/change-requests/:changeRequestId/refuse
+- **Week 7:** Sprint 4 — SG2-65.
+- **Source:** `app.ts:323`; `events/changeRequests.ts`; `decide_event_change_request`.
+- **Permission:** `event_request.change_request.refuse` (EC); the assigned coordinator only.
+- **Body:** `{ reason }`, trimmed, not blank, at most 1000 characters.
+- **200:** `{ event_id, change_request_id, status: "refused" }`. The event is left as it is.
+- **Errors:** 400 `Give a reason for refusing, up to 1000 characters.`; 400 `eventId must be a positive integer.`; 403; 404 `Event not found.` / `Change request not found.`; 409 `This change request has already been decided. Refresh to see the latest.`; 503.
+- **Side effects:** the refusal reason, who and when are stored on the request; a history row; a `change_refused` notice with the reason goes to the requesting organiser.
+
+### 4.25 POST /api/event-requests/:eventId/rechecks/:key/settle
+- **Week 7:** Sprint 4 — SG2-66 AC4; safety keys SG2-93, SG2-92 AC4.
+- **Source:** `app.ts:328`; `events/changeRequests.ts`; `db/changeImpact.ts` (`settle_arrangement_recheck`).
+- **Permission:** `event_request.rechecks.settle` (EC); the assigned coordinator only.
+- **Path:** `key` is one of `venue_recheck`, `equipment_recheck`, `registration_recheck`, `safety_venue_recheck`, `safety_equipment_recheck`, `safety_other_recheck`.
+- **Body:** none.
+- **200:** `{ event_id, arrangements_recheck_needed, outstanding_arrangements[] }`.
+- **Errors:**
+  - 400 `key must be one of …` / `eventId must be a positive integer.`
+  - 403; 404 `Event not found.`
+  - 409 `That arrangement is not waiting for a recheck.`
+  - 409 `{ error: "This arrangement still needs attention before it can be marked rechecked.", blockers[] }` (arrangements still outstanding, or, for the safety keys, requests the Safety Officer flagged that Venue Staff or Technical Support have not confirmed again)
+  - 409 `This event changed while you were deciding. Refresh and try again.`
+  - 503
+- **Note:** `safety_other_recheck` is also how a coordinator resubmits a reworked Safety Rejected event (4.28); the refresh trigger then returns it to Awaiting Safety Check once everything is ready (migration `202610290002_safety_rework_resubmit.sql`).
+
+### 4.26 POST /api/event-requests/:eventId/safety-decision
+- **Week 7:** #6 — SG2-92, SG2-93.
+- **Source:** `app.ts:337`; `events/safetyDecisionRoutes.ts`, `events/safetyDecisions.ts`, `db/safetyDecisions.ts`; migrations `202610190005_safety_decisions.sql`, `202610190006_safety_decision_revision.sql`, `202610240001_safety_changes_requested.sql` (`record_safety_decision`).
+- **Permission:** `event_request.safety_decision.record` (SO).
+- **Body:** `{ decision: "approve" | "reject" | "request_changes", reason?, arrangements?, safety_check_revision }`.
+  - `reason`: at most 2000 characters; required to reject or request changes, optional for approve.
+  - `arrangements`: a non-empty set drawn from `venue`, `equipment`, `other`, each at most once, required for `request_changes` and refused otherwise.
+  - `safety_check_revision`: the whole-number revision shown by 5.5 for the event.
+- **201:** `{ decision: { decision_id, event_id, decision, reason, arrangements[], decided_by, decided_by_name, decided_at }, previous_status, status }`.
+- **Errors:**
+  - 400 `{ error: "Invalid safety decision", details[] }`; 400 `eventId must be a positive integer.`
+  - 403 `Access denied` (role revoked since sign-in)
+  - 404 `Event not found.`
+  - 409 `{ error: "This event is no longer awaiting a safety check.", status }`
+  - 409 `{ error: "This event changed after you opened it. Refresh the safety checks and review it again.", code: "stale", revision }`
+  - 503 `Safety checks are temporarily unavailable. Please try again later.`
+- **Data:** RPC `record_safety_decision`, one transaction, with the verified actor from the principal. Approve moves the event to `preparation`, Reject to `safety_rejected`, Request Changes back to `planning` with the named arrangements outstanding (`safety_venue_recheck`, `safety_equipment_recheck`, `safety_other_recheck`) and each affected venue booking or equipment request flagged for Venue Staff or Technical Support (5.6). Approve is the only way into Preparation (the `safety_approval_gate` trigger, SG2-94).
+- **Side effects:** a `safety_decision` row in `event_safety_decisions`, an `event_audit_logs` row, and a `safety_decision` notice to the organiser and the coordinator.
+
+### 4.27 GET /api/event-requests/:eventId/safety-decisions
+- **Week 7:** #6 — SG2-92, SG2-93.
+- **Source:** `app.ts:342`; `events/safetyDecisionRoutes.ts`.
+- **Permission:** `event_request.safety_decisions.view` (SO, EC, EO).
+- **200:** `{ decisions: [decision, …] newest first, rereviews: [{ review_id, decision_id, arrangement, label, flagged_at, resolution: "confirmed"|"withdrawn"|null, resolved_by_name, resolved_at }] }`; the decision shape is as in 4.26.
+- **Errors:** 400 `eventId must be a positive integer.`; 404 `Event not found.` for an event the caller may not see; 503.
+- **Rule:** any Safety Officer, the event's assigned coordinator, or its creating organiser.
+
+### 4.28 POST /api/event-requests/:eventId/rework
+- **Week 7:** #6 — SG2-92 AC4.
+- **Source:** `app.ts:347`; `events/safetyDecisionRoutes.ts`; `db/safetyDecisions.ts` (`rework_safety_rejected_event`, latest in `202610290002_safety_rework_resubmit.sql`).
+- **Permission:** `event_request.safety_rework` (EC); the assigned coordinator only.
+- **Body:** none.
+- **200:** `{ event_id, status }`, the new status being `planning`.
+- **Errors:** 400 `eventId must be a positive integer.`; 404 `Event not found.`; 409 `{ error: "Only a Safety Rejected event can be reworked.", status }`; 503.
+- **Side effects:** the event moves from `safety_rejected` to `planning` and `safety_other_recheck` is marked outstanding; the coordinator resubmits it by settling that key (4.25).
+
 ---
 
 ## 5. Queues and notifications
@@ -540,13 +726,87 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 ### 5.3 GET /api/notifications
 - **Week 7:** New since W7 — SG2-49; ECL grant SG2-68.
 - **Source:** `app.ts:138`; `notifications/index.ts`.
-- **Permission:** `notifications.read` (EC, VS, TSS, EO, ECL). The Safety Officer does not hold it.
+- **Permission:** `notifications.read` (EC, VS, TSS, EO, ECL). The Safety Officer and the Attendee do not hold it; every role reads its own notices through the inbox (5.8) instead.
 - **200:** `{ notifications: [{ notification_id, event_id, request_id, kind, message, created_at }] }`
   - The newest 50 for the caller.
-  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`, `venue_unavailable`.
+  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`, `venue_unavailable`, `event_returned_to_planning`, `safety_decision`, `outstanding_arrangements`, `change_requested`, `change_accepted`, `change_refused`, `cancellation_requested`, `event_cancelled`, `venue_booking_cancelled`, `venue_change_requested`, `event_changed`, `registration_confirmed`, `registration_withdrawn`, `registration_full`, `registration_opened`, `registration_closed`, `waiting_list_offer`, `waiting_list_offer_lapsed` (the `notifications_kind_check` list after migration `202610280001_waiting_list.sql`).
 - **Errors:** 503.
 - **Data:** `notifications`, filtered on `recipient_id` = caller and by RLS (user-scoped client).
 - **Hold notices** are a separate endpoint: 8.3.
+
+### 5.4 GET /api/coordinator-overview
+- **Week 7:** #5 — SG2-89.
+- **Source:** `app.ts:189`; `coordinatorOverview/index.ts`; `db/coordinatorOverview.ts`.
+- **Permission:** `event_request.oversight.view` (ECL).
+- **Query:** `coordinatorId` and `status`, each optional and at most once (400 `Give <key> at most once.`). `status` must be an active event status (400 `status must be the status of an active event.`); `coordinatorId` must be an Event Coordinator in the roster (400 `coordinatorId must be an Event Coordinator.`).
+- **200:** `{ events: [{ event_id, name, organisation, status, proposed_date, coordinator_id, coordinator_name }], coordinators: [{ user_id, name, active_events, assignable }], statuses[] }`.
+  - `events` are the active events whose coordinator the caller last assigned or reassigned (`events.coordinator_assigned_by`), soonest first, in every assignable status except `unassigned`.
+  - `coordinators` lists every Event Coordinator with how many of the caller's active events they hold, counted before the filters apply; a former coordinator still holding events appears with `assignable: false`.
+- **Errors:** 503 `The coordinator overview is temporarily unavailable. Please try again.`
+- **Data:** `events` and `account_roles` through the service-role client.
+
+### 5.5 GET /api/safety-checks
+- **Week 7:** #6 — SG2-91.
+- **Source:** `app.ts:181`; `safetyChecks/index.ts`; `db/safetyChecks.ts`; migration `202610190004_safety_check_queue.sql` (`safety_check_queue`).
+- **Permission:** `safety_checks.read` (SO).
+- **200:** `{ events: [{ event_id, safety_check_revision, name, organisation, proposed_date, awaiting_since, expected_attendance, accessibility_needs, expected_crowd_movement, venues: [{ request_id, venue_id, venue_name, location, capacity, layout, starts_at, ends_at, accessibility_features, emergency_access, known_restrictions }], equipment: [{ request_id, equipment_name, quantity, placement_venue_name, placement_position, arrangement_notes }] }] }`. `safety_check_revision` goes back with the decision in 4.26.
+- **Errors:** 503 `The safety check list is temporarily unavailable. Please try again.`
+- **Data:** RPC `safety_check_queue()` with the caller's token, which rechecks the stored role, so a Safety Officer whose role has changed is refused (403).
+
+### 5.6 GET /api/safety-rereviews
+- **Week 7:** #6 — SG2-93.
+- **Source:** `app.ts:192-195`; `events/safetyRereviewRoutes.ts`; `db/safetyRereviews.ts`.
+- **Permission:** `safety_rereviews.read` (VS, TSS). The acting role picks the kind: venue for Venue Staff, equipment for Technical Support.
+- **200:** `{ arrangement: "venue"|"equipment", rereviews: [{ review_id, arrangement, event_id, event_name, proposed_date, coordinator_name, flagged_at, label, reason, decided_by_name, layout, placement_venue_name, placement_position }] }`, open flags only, oldest first.
+- **Errors:** 503 `Safety checks are temporarily unavailable. Please try again later.`
+
+### 5.7 POST /api/safety-rereviews/:reviewId/confirm
+- **Week 7:** #6 — SG2-93.
+- **Source:** `app.ts:194`; `events/safetyRereviewRoutes.ts` (`confirm_safety_rereview`).
+- **Permission:** `safety_rereviews.confirm` (VS, TSS); the flag must be of the acting role's kind.
+- **Body:** none.
+- **200:** `{ review_id, event_id, status, outstanding_arrangements[] }`. The last flag of its kind settles that safety recheck, and the event returns to Awaiting Safety Check once nothing is outstanding.
+- **Errors:** 400 `reviewId must be a positive integer.`; 403 `Access denied` (another kind of flag, or role revoked); 404 `That safety re-review was not found.`; 409 `{ error: "This booking or equipment request has already been dealt with.", resolution }`; 503.
+
+### 5.8 GET /api/notifications/inbox
+- **Week 7:** Sprint 4 — SG2-69.
+- **Source:** `app.ts:168`; `notifications/index.ts`; `db/notificationInbox.ts`; migration `202610200003_notifications_inbox_reminders.sql` (`notification_inbox`). See [notification-inbox.md](../notification-inbox.md).
+- **Permission:** `notifications.inbox` (all 7 roles); the rows are the caller's own.
+- **Query:** none for the first page; for the next page all three of `before_created_at` (ISO date-time, microseconds kept), `before_source` (`event` or `hold`) and `before_id`, exactly as `next_cursor` returned them. Anything else is 400 `Enter a valid notification identity or complete pagination cursor.`
+- **200:** `{ notifications: [{ source: "event"|"hold", notification_id, event_id, kind, message, created_at, read_at }], unread_count, next_cursor: { created_at, source, notification_id } | null }`. Page size 50, newest first, merging `notifications` and `venue_hold_notifications`; `unread_count` covers every unread row, not only the page.
+- **Errors:** DB-mapped 401/403/503.
+- **Data:** RPC with the caller's token; `Cache-Control: no-store`.
+
+### 5.9 POST /api/notifications/read-all
+- **Week 7:** Sprint 4 — SG2-69.
+- **Source:** `notifications/index.ts`; RPC `read_all_notifications()`.
+- **Permission:** `notifications.inbox` (all 7).
+- **Body:** none. **200:** `{ unread_count }`. Marks the caller's unread rows read from one snapshot; a notice arriving meanwhile stays unread.
+
+### 5.10 GET and PUT /api/notifications/reminder-preferences
+- **Week 7:** Sprint 4 — SG2-69.
+- **Source:** `notifications/index.ts`; RPCs `notification_reminder_preferences()`, `set_notification_reminder_preferences(p_frequency_days)`.
+- **Permission:** `notifications.reminders.manage` (EC); the RPCs recheck the acting role.
+- **GET 200:** `{ frequency_days }`, 1 when never set.
+- **PUT body:** `{ frequency_days }`, the only key, a whole number from 1 to 30. **200:** `{ frequency_days }`.
+- **Errors:** 400 `Choose a reminder interval from 1 to 30 whole days.`; DB-mapped 401/403/503.
+- **Effect:** the setting is the cadence of the hourly pg_cron job `sg2-69-arrangement-reminders` (`send_outstanding_arrangement_reminders()`), which sends `outstanding_arrangements` notices to coordinators.
+
+### 5.11 POST /api/notifications/:source/:id/read
+- **Week 7:** Sprint 4 — SG2-69.
+- **Source:** `notifications/index.ts`; RPC `read_notification(p_source, p_notification_id)`.
+- **Permission:** `notifications.inbox` (all 7).
+- **Path:** `source` is `event` or `hold`; `id` is a positive integer.
+- **200:** `{ notification: { source, notification_id, event_id, kind, message, created_at, read_at }, unread_count }`. Idempotent: an already-read notice keeps its first `read_at`.
+- **Errors:** 400 `Enter a valid notification identity or complete pagination cursor.`; 404 `Notification or related event is no longer available.` (not the caller's, or missing); DB-mapped 401/403/503.
+
+### 5.12 GET /api/notifications/:source/:id/event
+- **Week 7:** Sprint 4 — SG2-69.
+- **Source:** `notifications/index.ts`; RPC `notification_event(p_source, p_notification_id)`.
+- **Permission:** `notifications.inbox` (all 7).
+- **200:** `{ event: { event_id, name, status, proposed_date } }`, the summary of the event a notice is about.
+- **Errors:** 400 as 5.11; 404 `Notification or related event is no longer available.`; DB-mapped 401/403/503.
+- **Rule:** the caller must own the notice and, as the acting role, still have a relationship to the event: the creating organiser of the organisation, a registered attendee, or an internal role passing `private.event_relationship_exists()`. Otherwise 404.
 
 ---
 
@@ -581,6 +841,18 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
   - 400 `Invalid venue ID.`
   - 400 field message
   - 404 `Venue not found or no longer editable.`
+
+### 6.3a DELETE /api/venues/:venueId
+- **Week 7:** Sprint 4 — SG2-106.
+- **Source:** `venues/index.ts:54`; `db/venues.ts` (`remove`); migrations `202610170007_venue_delete_hold_expiry.sql`, `202610190001_venue_delete_past_holds.sql` (`delete_venue`).
+- **Permission:** `venues.delete` (VS); the RPC rechecks the stored role.
+- **200:** `{ venue: { venue_id, name, deleted_at, deleted_by } }`. A soft delete: the row stays so past bookings, requests and history remain; the venue then drops out of `GET /api/venues` and the other lists.
+- **Errors:**
+  - 400 `Invalid venue ID.`
+  - 404 `Venue not found or already deleted.`
+  - 409 `{ error: "This venue still has current or future bookings, holds or pending requests.", blockers: [{ kind: "booking"|"hold"|"request", id, event_id, event_name, starts_at, ends_at }] }`
+  - DB-mapped 401/403/503
+- **Rule:** under the venue lock, tentative holds past their deadline are expired first; the delete is refused while a held or confirmed booking that has not ended, a live tentative hold or a pending request (not owned by a live hold) remains. Triggers refuse new requests, bookings, holds and unavailability blocks on a deleted venue.
 
 ### 6.4 GET /api/venues/:venueId/layouts
 - **Source:** `venues/layouts.ts:54`.
@@ -740,18 +1012,19 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - `starts_at`: in the future
   - `ends_at`: after `starts_at`
   - `layout`: one of the layouts in 6.5
-  - `replaces_booking_id`: optional positive whole ID of an affected confirmed booking belonging to this event; omit or send null for an ordinary request (SG2-81)
+  - `replaces_booking_id`: optional positive whole ID of a confirmed booking belonging to this event; omit or send null for an ordinary request (SG2-81 replacement of an affected booking; SG2-83 change of any current booking, see below)
 - **201:** `{ request, booking: "allowed"|"needs_capacity_exception", conflicts: [{ kind: "booking"|"hold", reference_id, event_id, event_name, starts_at, ends_at, status }] }`
 - **Errors:**
   - 400 `Choose an event, a venue, a layout and a future period that starts before it ends.`
   - 404 `Event not found.` / `Venue not found.`
-  - 409 ordinary request event not `approved` or `planning`; replacement additionally permits `preparation` and `confirmed`
-  - 409 replacement reference is not an affected booking of this event
+  - 409 ordinary request: event not `approved`, `planning` or `awaiting_safety_check`; replacement or change additionally permits `preparation` and `confirmed`
+  - 409 replacement or change reference is not a current confirmed booking of this event (SG2-83: `That booking is not a current confirmed booking of this event, so it cannot be changed.`)
   - 409 layout not offered
   - 409 required facility missing
   - 409 overlapping duplicate request for the same event and venue
 - **Rule:** only the assigned EC. An event may have **several** requests for different venues; SG2-82 is change #3.
 - **Replacement:** uses this same route and the existing 7.4 decision route. A pending replacement reserves nothing. Approval creates the new booking and releases the referenced old one atomically; rejection leaves the old booking intact. The Coordinator UI prefills the affected booking's period and event requirements for the existing venue search.
+- **Change one venue (SG2-83):** `replaces_booking_id` may name any confirmed booking of the event that has not ended. `change_reason` (at most 500 characters) is then required unless the booking is affected by a venue unavailability. A reference that is no longer a current confirmed booking is 409 `That booking is not a current confirmed booking of this event, so it cannot be changed.` On a Confirmed or Preparation event the new pending request returns the event to Planning with a venue recheck outstanding, and Venue Staff get a `venue_change_requested` notice (migration `202610210002_venue_booking_change_cancel.sql`). A request is also accepted while the event is `awaiting_safety_check` (SG2-91).
 - **Conflicts:**
   - Cover confirmed bookings and live holds within the venue's setup + turnaround gap (SG2-78).
   - They are reported, not refused.
@@ -845,7 +1118,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 ## 8. Venue holds, bookings and clashes
 
 **Holds (W7 #4):**
-- All six hold routes (`venues/holds.ts`) call SECURITY DEFINER RPCs with the caller's token and send `Cache-Control: no-store`.
+- All seven hold routes (`venues/holds.ts`) call SECURITY DEFINER RPCs with the caller's token and send `Cache-Control: no-store`.
 - **Hold record:** `hold_id, event_id, event_name, venue_id, venue_name, request_id, booking_id, starts_at, ends_at, expires_at, status ("tentative"|"converted"|"released"|"expired"), created_at`.
 - **Expiry** is not an endpoint:
   - pg_cron job `venue-hold-deadlines` runs `public.process_venue_hold_deadlines()` every minute (`202610050001_venue_holds.sql`).
@@ -871,7 +1144,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Week 7:** #4 — SG2-84/85.
 - **Source:** `holds.ts:41`.
 - **Permission:** `venues.holds.read` (EC, VS, TSS).
-- **200:** `{ notifications: [{ notification_id, event_id, hold_id, kind: "placed"|"warning"|"expired", message, created_at }] }`, the caller's own.
+- **200:** `{ notifications: [{ notification_id, event_id, hold_id, kind: "placed"|"warning"|"expired"|"expiry_changed", message, created_at }] }`, the caller's own.
 - **Data:** RPC `list_venue_hold_notifications()`, over the table `venue_hold_notifications`.
 
 ### 8.4 POST /api/venue-holds
@@ -918,6 +1191,19 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Required venue facilities are missing. Choose a suitable venue.`
 - **Data:** RPC `change_venue_hold(p_hold_id, 'convert')`. The latest definition is in `202610190002_venue_staff_capacity_exceptions.sql` (only a Venue Staff capacity exception counts, SG2-66 AC5).
 
+### 8.6a POST /api/venue-holds/:holdId/expiry
+- **Week 7:** #4 — SG2-106.
+- **Source:** `holds.ts:50`; `venues/holdFields.ts` (`validateHoldExpiry`); migration `202610170007_venue_delete_hold_expiry.sql` (`change_venue_hold_expiry`).
+- **Permission:** `venues.holds.manage` (VS).
+- **Body:** `{ expires_at }`, the only key, an ISO date-time with a time zone in the future.
+- **200:** `{ hold }`, still `tentative`, with the new `expires_at`.
+- **Errors:**
+  - 400 `Enter a new future expiry with a time zone, different from the current one.`
+  - 400 an invalid `holdId` gets the same message as 8.4
+  - 404 `Event, venue or tentative hold not found.`
+  - 409 `This hold is no longer active. Place a new request.` (not tentative, or already past its deadline)
+- **Data:** RPC `change_venue_hold_expiry(p_hold_id, p_expires_at)` under the venue then hold locks. It bumps `expiry_revision` (a new notice round), resets the warning, writes a `venue_hold_expiry` history row and sends an `expiry_changed` notice, plus a `warning` at once when the new expiry is inside the lead time.
+
 ### 8.7 GET /api/venue-bookings
 - **Week 7:** New since W7 — SG2-51.
 - **Source:** `venues/bookings.ts:89`.
@@ -930,21 +1216,23 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 404 `Event not found.` / `Venue not found.`
 
 ### 8.8 POST /api/venue-bookings/:bookingId/release
-- **Week 7:** New since W7 — SG2-51; #3 — SG2-82.
-- **Source:** `venues/bookings.ts:122`.
-- **Permission:** `venue_bookings.release` (VS, EC).
-- **Body:** `{ reason }`, at most 500 characters, required.
-- **200:** `{ booking_id, status: "cancelled", cancelled_at, cancellation_reason }`
+- **Week 7:** New since W7 — SG2-51; W7 #3 — SG2-82, SG2-83.
+- **Source:** `venues/bookings.ts:142`; `db/venueBookings.ts`; migration `202610210002_venue_booking_change_cancel.sql` (`release_venue_bookings`, replacing `release_venue_booking`).
+- **Permission:** `venue_bookings.release` (EC only since SG2-83 AC5; Venue Staff mark the venue unavailable instead, 6.13). The RPC allows only the event's assigned coordinator.
+- **Body:** `{ reason, also_cancel? }`. `reason` is required, at most 500 characters. `also_cancel` is an optional list of at most 50 other booking IDs of the same event to cancel in the same call; nothing else is touched unless named (SG2-83 AC1/AC2).
+- **200:** `{ booking_id, status: "cancelled", cancelled_at, cancellation_reason, also_released: number[], returned_to_planning }`
 - **Errors:**
   - 400 `Invalid booking ID.`
   - 400 `Give a reason for releasing this booking, in 500 characters or fewer.`
-  - 404 `Booking not found.`
+  - 400 `Choose at most 50 other bookings of this event to cancel as well.`
+  - 404 `Booking not found.` (also another coordinator's booking)
   - 409 `This booking has already been released.` / `Only a confirmed booking can be released.` / `This booking has already ended, so there is nothing to release.`
-- **Rule:** an EC only for their own event (checked inside the RPC).
-- **Data:** RPC `release_venue_booking(p_booking_id, p_reason)` (`202610100002_venue_booking_release.sql`). The RPC:
-  - cancels the booking and its approved request
+  - 409 `Each other booking chosen must be a confirmed booking of this event that has not ended. Nothing was cancelled.`
+- **Data:** RPC `release_venue_bookings(p_booking_id, p_also_cancel, p_reason)`, one transaction under the venue locks. The RPC:
+  - cancels each booking and its approved request, and withdraws any pending replacement request that pointed at it
   - moves `events.venue_booking_id` to the earliest remaining confirmed booking (SG2-82)
-  - writes history and `venue_booking_released` notices
+  - writes history (who, when, why) and `venue_booking_released` notices to the coordinator and organiser, plus a `venue_booking_cancelled` notice to every Venue Staff account (SG2-83 AC4)
+  - returns a Confirmed or Preparation event to Planning with a venue recheck outstanding (SG2-83 AC7)
 
 ### 8.9 GET /api/venue-clashes
 - **Week 7:** #1 — SG2-79.
@@ -1070,6 +1358,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Source:** `equipment/reservations.ts:76`. This is a plain router mounted at `/api`.
 - **Permission:** `requireAuth` + `equipment.reservations.manage` (TSS).
 - **Body:** only `event_id`, `version`, `starts_at` and `ends_at`; the times are ISO strings with a time zone.
+- **Start time:** `starts_at` must be in the future, otherwise 400 `Choose a reservation start in the future.` (the RPC also enforces it, `202610310001_equipment_reservation_future_start.sql`).
 - **201:** `{ can_reserve, reservations[], coordinator_notified: true }`
 - **Errors:** `{ error, code }`, where `code` is one of:
   - 400 `invalid`
@@ -1166,29 +1455,23 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 
 ---
 
-## 11. Week 7 work with no endpoint yet («planned»)
+## 11. Work still without an endpoint
 
-SG2-81 replacement is implemented by 7.1/7.4, 8.7 and arrangement readiness; SG2-88 is Done using 4.7/4.8. SG2-98 is also Done in the 16 Oct Jira snapshot; overlapping unavailability is accepted (6.13), with removal through 6.14. These are not planned endpoints.
+None. At `4881413` every route registered in `app.ts` and the routers it mounts is in §2 (108 pairs), and no Week 7 change or Sprint 4 story waits for an endpoint:
+- **Week 7 changes #1 to #6:** setup and turnaround (6.6 to 6.10, 8.9), unavailability and replacement (6.12 to 6.14, 7.1, 7.4), several venues per event (7.1, 7.5, 8.8), tentative holds with expiry (§8, 8.6a), the Event Coordinator Lead (4.7, 4.8, 5.1, 5.4) and the safety check (4.26 to 4.28, 5.5 to 5.7).
+- **Sprint 4:** registration (9B, 4.13a), cancellation (4.20, 4.21), change requests (4.22 to 4.25), the notification inbox (5.8 to 5.12), event search (9A), multi-role accounts ([Acting role](#acting-role-sg2-104), 3.1, 3.3, 3.4), required fields (4.6) and venue delete and hold expiry (6.3a, 8.6a).
 
-No endpoint at this snapshot delivers these planned stories. They are listed so that nobody reads an endpoint into them. The API surface they will add is not yet designed, so no path is proposed here.
-
-| Change | Story (Jira To Do) | What exists at this snapshot today |
-|---|---|---|
-| #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
-| #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-93, SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; SG2-94 (22 Oct 2026) made the latest Approve the only way into Preparation and a condition of confirmation, with no new endpoint. SG2-93 (24 Oct 2026) added `GET /api/safety-rereviews` and `POST /api/safety-rereviews/:reviewId/confirm` (`safety_rereviews.read` / `.confirm`, Venue Staff and Technical Support), the `safety_*_recheck` keys on the SG2-66 settle route, and `rereviews` on the decisions read; see [safety-checks.md](../safety-checks.md). |
+The epics SG2-13, SG2-14, SG2-16, SG2-17 and SG2-18 are not built and have no endpoint; they are not part of this specification.
 
 ---
 
 ## Doc vs code
 In each case the code wins, and this spec follows the code.
-1. **`docs/authorization.md` vs `PATCH /api/users/:userId/role`.** The doc says the module "does not … expose an endpoint for changing roles", but `app.ts:154-156` mounts one (`users.role.update`, TSS).
+1. **`docs/authorization.md` vs `PATCH /api/users/:userId/role`.** The doc says the module "does not … expose an endpoint for changing roles", but `app.ts:201` mounts one (`users.role.update`, TSS).
 2. **`docs/authorization.md` vs the service-role key.** The doc says the auth module "does not use the service-role key". That is true of `requireAuth`, but logout and most event, queue, profile, suitability, booking-request and clash handlers use the service-role client (`getSupabaseAdminClient`). See ADR-02 in [architectural-decisions.md](architectural-decisions.md).
-3. **`STATUS_TRANSITIONS` vs the handlers.** `STATUS_TRANSITIONS` (`events/fields.ts`) is not consulted by any handler; `canTransition` is used only in tests. Two handlers go beyond the table:
-   - submit writes `rejected`/`needs_clarification → submitted` when a coordinator is already assigned
-   - planning can set `planning` from any non-terminal status once an impact is confirmed
+3. **Status transitions.** `STATUS_TRANSITIONS` and `canTransition` no longer exist: PR #120 (SG2-22, commit `ca54162`) removed them from `events/fields.ts`, and nothing in `server/src` references them. Each handler or RPC enforces its own status guards (for example `confirm_event`, `cancel_event`, `record_safety_decision`), and database triggers guard two transitions: `safety_approval_gate` (no move into Preparation except through a Safety Officer Approve) and `keep_cancelled_events_cancelled`. Docs that still cite the table (`docs/event-cancellation.md`, `docs/event-confirmation.md`, `docs/organisation-events.md`, `docs/venues.md`) are out of date on this point.
 
 ## How the route list was verified
-1. **Registrations:** every `app.(get|post|use)` in `app.ts` and every `router.(get|post|patch|put|delete)` / `eventRequests.*` / `rolesRouter.*` registration in the mounted routers were listed with a regex and joined to their mount prefixes.
-2. **Count:** the original code/index comparison established 70 registrations and 73 method/path pairs. This revision adds the explicit GET registration in `createBookingRequestSuitabilityRouter`, mounted at `/api/venue-booking-requests`, giving 71 registrations and 74 unique indexed pairs. The three dual-path registrations (work queue and the two health checks) are unchanged. The original 73 index entries are retained verbatim; the added contract is row 74.
-3. **Permissions:** each permission key in §2 is the literal argument to `requirePermission` at that registration, and each role list is that key's entry in `PERMISSIONS`.
+1. **Registrations:** every `app.(get|post|use)` in `app.ts`, and every `router.(get|post|patch|put|delete)` / `eventRequests.*` / `rolesRouter.*` / `safetyRereviews.*` registration in the mounted routers (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue,safetyChecks,eventSearch,registrableEvents,myRegistrations,coordinatorOverview}/*.ts`), were listed with a regex and joined to their mount prefixes, re-run against `main` at `4881413` (3 Nov 2026).
+2. **Count:** 105 registrations give 108 method + path pairs. Three registrations serve two paths each (the work queue and the two health checks). By area: auth 3, role update 1, event requests 32, safety re-reviews 2, venues 15 (availability 2, search 1, suitability 1, venues 4, layouts 2, operations 2, blocks 3), venue booking requests 8, notifications 7, venue holds 7, venue bookings 2, venue clashes 1, equipment 10, assignment queue 1, safety checks 1, event search 2, registrable events 5, my registrations 2, coordinator overview 1, profile 2, work queue 2, health 4. The earlier revision's 74 pairs are rows 1 to 74; rows 75 to 108 are the additions since.
+3. **Permissions:** each permission key in §2 is the literal argument to `requirePermission` at that registration, and each role list is that key's entry in `PERMISSIONS` (`server/src/auth/policy.ts`). Routes that carry no key are login, logout, health and `/api/auth/me`.

@@ -1,9 +1,9 @@
-' ConnectSphere — Week 7 sequence diagrams (SG2-95)
-' Five flows, one diagram block each. Sources: docs/design/behaviour-notes.md.
+' ConnectSphere — sequence diagrams (SG2-95)
+' Eight flows, one diagram block each. Sources: docs/design/behaviour-notes.md.
 ' Render: java -jar plantuml.jar -tpng docs/design/sequence-diagrams.puml
 
 @startuml seq-1-availability-and-booking-decision
-title Seq 1 — Availability check and booking decision with setup & turnaround (SG2-78/79)\nas of PR90 head 61416cc (16 Oct 2026)
+title Seq 1 — Availability check and booking decision with setup & turnaround (SG2-78/79)\nas of main 4881413 (3 Nov 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 skinparam ParticipantPadding 6
@@ -41,6 +41,8 @@ else
     DB -> DB : insert venue_bookings (confirmed)\nupdate events.venue_booking_id (keep earliest, SG2-82)\nupdate venue_booking_requests -> approved\ninsert event_audit_logs, notifications (coordinator + organiser)
     DB -> DB : trigger venue_bookings_refresh_clashes\n-> refresh_venue_booking_clashes(venue_id)
     note right of DB #FFF4CC : <<Week 7>> SG2-79\nflags pairs closer than setup+turnaround\nin venue_booking_clashes, notifies\ncoordinators ('venue_booking_clash')
+    DB -> DB : trigger safety_check_refresh (venue_bookings, venue_booking_requests; SG2-91)\n-> refresh_safety_check_status(event)
+    note right of DB : If every venue and equipment arrangement is now in place,\nan Approved/Planning event moves to awaiting_safety_check (Seq 5)
     DB --> API : {outcome:'updated', ...}
     deactivate DB
     API --> WEB : 200
@@ -56,12 +58,11 @@ API --> WEB : clashesFor(rows, principal)
 legend right
   |= Colour |= Meaning |
   |<#FFF4CC>| <<Week 7>> addition |
-  |<#DDDDDD>| <<planned>> not built (dashed) |
 endlegend
 @enduml
 
 @startuml seq-2-venue-temporarily-unavailable
-title Seq 2 — Unavailability, affected bookings and replacement (SG2-80/81)\nas of PR90 head 61416cc (16 Oct 2026)
+title Seq 2 — Unavailability, affected bookings, replacement, and change/cancel of one venue (SG2-80/81/83)\nas of main 4881413 (3 Nov 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Venue Staff" as VS
@@ -102,16 +103,35 @@ DB -> DB : lock venues; recheck role, period, conflicts and capacity\ninsert new
 note right of DB : One transaction; a failed decision rolls back.\nReleasing old booking removes its disruption flag.
 DB --> API : decided request
 API --> WEB : 200 {request}; refresh bookings and arrangements
-note over API, DB : Final confirm_event is 202610170002: affected bookings AND\npersisted venue/equipment/registration rechecks block confirmation.\nReplacement alone does not clear unrelated rechecks.
+note over API, DB : Final confirm_event (latest body 202610290001_requested_equipment_outstanding.sql): affected bookings AND\npersisted venue/equipment/registration rechecks block confirmation; so does a missing safety approval (SG2-94).\nReplacement alone does not clear unrelated rechecks.
+
+== Change or cancel one venue of an event (SG2-83) ==
+EC -> WEB : cancel one booking: reason, optionally the other bookings of the same event to cancel with it
+WEB -> API : POST /api/venue-bookings/:bookingId/release\n{reason, also_cancel?} [venue_bookings.release: Event Coordinator only]
+API -> DB : rpc release_venue_bookings(p_booking_id, p_also_cancel, p_reason) (caller JWT)
+DB -> DB : acting role = event_coordinator; caller is the event's assigned coordinator;\nbooking confirmed and not ended; named others are live bookings of the same event
+DB -> DB : per booking: cancelled (who, when, why); its approved request -> cancelled;\na pending replacement request is withdrawn; history; notify Coordinator + Organiser\n(venue_booking_released) and every Venue Staff account (venue_booking_cancelled)
+note right of DB : Other bookings of the event stay unless named (AC1/AC2);\nthe cancelled period and its setup/turnaround are free again (AC3).
+DB -> DB : return_event_to_planning_for_venue(p_recheck := true)
+opt event in Preparation or Confirmed
+  DB -> DB : status -> planning; clear confirmed_by/at; venue_recheck outstanding;\nhistory; notify Organiser + Coordinator (event_returned_to_planning)
+end
+DB --> API : {outcome:'released', also_released, returned_to_planning}
+API --> WEB : 200
+EC -> WEB : change one booking to another venue, with a reason
+WEB -> API : POST /api/venue-booking-requests\n{event_id, venue_id, starts_at, ends_at, layout, replaces_booking_id, change_reason}
+API -> DB : insert pending request (event Approved, Planning, Awaiting Safety Check, Preparation or Confirmed)
+DB -> DB : trigger venue_change_request_check: replaced booking is a live confirmed booking of the same event\ntrigger venue_change_requested: history with the reason; notify Venue Staff (venue_change_requested);\nreturn_event_to_planning_for_venue(p_recheck := false)
+note right of DB : The original booking stays until Venue Staff approve the change\n(decide_venue_booking_request -> release_replaced_booking, as above).
 legend right
   |= Scope |= Meaning |
   | SG2-81 | implemented using existing request/decision routes |
-  | SG2-83 | general venue change/cancellation remains planned |
+  | SG2-83 | implemented: release_venue_bookings and replacement requests with change_reason (202610210002) |
 endlegend
 @enduml
 
 @startuml seq-3-tentative-hold-expiry
-title Seq 3 — Tentative venue hold placed -> pg_cron 24-hour warning and expiry (SG2-84/85)\nas of PR90 head 61416cc (16 Oct 2026)
+title Seq 3 — Tentative venue hold placed -> pg_cron 24-hour warning and expiry (SG2-84/85/106)\nas of main 4881413 (3 Nov 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Venue Staff" as VS
@@ -127,8 +147,9 @@ WEB -> API : POST /api/venue-holds [venues.holds.manage]
 API -> API : validateVenueHold
 API -> DB : rpc create_venue_hold(p_event_id, p_venue_id,\np_starts_at, p_ends_at, p_expires_at)
 activate DB
-DB -> DB : lock venue + event; event approved/planning\nwith coordinator; no clash within\nvenue_preparation_gap (SG2-78)
+DB -> DB : lock venue + event; event approved/planning/\nawaiting_safety_check with coordinator; no clash within\nvenue_preparation_gap (SG2-78)
 DB -> DB : insert venue_booking_requests (pending)\ninsert venue_holds (tentative)\ninsert event_audit_logs
+note right of DB : safety_check_refresh trigger (SG2-91): the new pending request\nmoves an Awaiting Safety Check event back to Planning
 DB -> DB : venue_hold_notice(h,'placed')\n-> venue_hold_notifications
 opt expires within warning_lead_seconds (default 86400)
   DB -> DB : set warning_sent_at; venue_hold_notice(h,'warning')
@@ -155,22 +176,24 @@ note right of CRON #FFF4CC : <<Week 7>> runs inside Supabase,\nnot in the API (2
 EC -> WEB : open notices
 WEB -> API : GET /api/venue-holds/notifications [venues.holds.read]
 API -> DB : rpc list_venue_hold_notifications()
-API --> WEB : placed / warning / expired notices
+API --> WEB : placed / warning / expired / expiry_changed notices
 
 == Before expiry (alternative) ==
 VS -> API : POST /api/venue-holds/:holdId/convert | /release
 API -> DB : rpc change_venue_hold(p_hold_id, p_action)
 note right of DB : convert = venue_bookings + request approved\n+ notifications to organiser (SG2-68);\nrelease = request cancelled
+VS -> API : POST /api/venue-holds/:holdId/expiry [venues.holds.manage]
+API -> DB : rpc change_venue_hold_expiry(p_hold_id, p_expires_at)
+note right of DB : SG2-106 (202610170007): new deadline; warning_sent_at reset so the\n24-hour warning can fire again; history row; notice 'expiry_changed'
 
 legend right
   |= Colour |= Meaning |
   |<#FFF4CC>| <<Week 7>> addition |
-  |<#DDDDDD>| <<planned>> not built (dashed) |
 endlegend
 @enduml
 
 @startuml seq-4-lead-assigns-coordinator
-title Seq 4 — Event Coordinator Lead assigns from the unassigned queue (SG2-87/97) with notices (SG2-68)\nas of PR90 head 61416cc (16 Oct 2026)
+title Seq 4 — Event Coordinator Lead assigns from the unassigned queue (SG2-87/97), notices (SG2-68), oversight (SG2-89)\nas of main 4881413 (3 Nov 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Event Coordinator Lead" as LEAD
@@ -190,6 +213,7 @@ WEB -> API : PATCH /api/event-requests/:eventId/coordinator\n{coordinatorId} [ev
 API -> DB : fetchEventRequestById
 API -> API : status in COORDINATOR_ASSIGNABLE_STATUSES? else 409
 API -> DB : getHeldRoles(coordinatorId) includes event_coordinator? else 400
+API -> API : coordinator is the event's own organiser? else 400 (separation of duties, SG2-104);\nalready the coordinator? 200, nothing written
 API -> DB : assignEventCoordinator: update events\nset coordinator_id [, status unassigned -> submitted]\nwhere status = from and coordinator_id = expected
 alt zero rows (changed meanwhile)
   API --> WEB : 409
@@ -204,55 +228,291 @@ else updated
     API --> WEB : 200 {request}
   end
 end
-note over LEAD, DB #FFF4CC : <<Week 7>> Reassignment of a live event (submitted ... confirmed) uses the same PATCH and never changes status (SG2-100).\nSG2-88 "assign/reassign as Lead" is Done in the 16 Oct Jira snapshot; SG2-89 oversight view is <<planned>>.
+note over LEAD, DB #FFF4CC : <<Week 7>> Reassignment of a live event (submitted ... confirmed) uses the same PATCH and never changes status (SG2-100).\nSG2-88 assign/reassign as Lead and SG2-89 oversight are built.
+
+== Oversight of the coordinators the Lead assigned (SG2-89) ==
+LEAD -> WEB : open coordinator overview
+WEB -> API : GET /api/coordinator-overview?coordinatorId&status [event_request.oversight.view: Lead only]
+API -> DB : fetchSupervisedEvents: events where coordinator_assigned_by = this Lead\nand status in OVERSIGHT_STATUSES (every assignable status except unassigned,\nincl. needs_clarification), soonest proposed_date first; listCoordinators for workloads
+API --> WEB : {events, coordinators (workload per coordinator), statuses}
+note over LEAD, DB : The latest Lead to reassign an event supervises it (202610220004_coordinator_oversight.sql).
 
 legend right
   |= Colour |= Meaning |
   |<#FFF4CC>| <<Week 7>> addition |
-  |<#DDDDDD>| <<planned>> not built (dashed) |
 endlegend
 @enduml
 
-@startuml seq-5-safety-check-planned
-title Seq 5 — Operational safety check decision «planned» (SG2-91/92/93/94) against existing statuses\nas of PR90 head 61416cc (16 Oct 2026)
+@startuml seq-5-safety-check-decision
+title Seq 5 — Operational safety check: hand-off, decision, rework, preparation gate (SG2-91/92/93/94)\nas of main 4881413 (3 Nov 2026)
 skinparam sequenceMessageAlign left
-skinparam noteBackgroundColor #DDDDDD
-skinparam sequence {
-  ArrowColor #888888
-  LifeLineBorderColor #888888
-}
+skinparam noteBackgroundColor #FFF4CC
 actor "Event Coordinator" as EC
 actor "Safety Officer" as SO
-participant "Web App\n(Safety Officer desk:\nempty state today)" as WEB
-participant "API\n(no safety handler yet)" as API
-database "Supabase Postgres\nevents.status enum" as DB
+actor "Venue Staff /\nTechnical Support" as STAFF
+participant "Web App" as WEB
+participant "API\nsafetyChecksRouter + event-requests\nsafety routes + safetyRereviews" as API
+database "Supabase Postgres" as DB
 
-note over EC, DB : Built today (SG2-100): statuses awaiting_safety_check, safety_rejected, preparation in public.event_status\nand STATUS_TRANSITIONS; Safety Officer role (SG2-86) with event_request.stage.view, history.view,\nequipment_requirements.read; venue safety details on venue_operations (SG2-77). No writer moves an event into these statuses.
+== Hand-off to the check (SG2-91) ==
+note over EC, DB : <<Week 7>> Statuses awaiting_safety_check, safety_rejected, preparation (SG2-100).\nNo endpoint sets awaiting_safety_check: the database does, whenever an arrangement changes.
+EC -> DB : any arrangement write: venue request, booking, hold, disruption, equipment request or reservation;\nor events.arrangements_recheck_needed / outstanding_arrangements / equipment_requirements
+DB -> DB : trigger safety_check_refresh -> refresh_safety_check_status(event): lock the event row
+alt status approved/planning and safety_check_arrangements_ready
+  DB -> DB : status -> awaiting_safety_check; safety_check_track_event stamps awaiting_safety_check_since\nand bumps safety_check_revision; history row
+else awaiting_safety_check and no longer ready
+  DB -> DB : status -> planning; history; notify Organiser + Coordinator (event_returned_to_planning)
+else awaiting_safety_check and still ready
+  DB -> DB : safety_check_revision + 1 (the review changed)
+end
+note right of DB : Ready = no recheck key outstanding; at least one venue request still needed,\nnone pending/rejected, each approved one backed by a confirmed booking, none disrupted;\nevery live equipment request placed, reserved, no shortfall; requested equipment\n(anything but 'None') has a live request (SG2-57, 202610290001).
 
-group <<planned>> SG2-91 send for safety check
-  EC --> WEB : send planned event for safety check
-  WEB --> API : <<planned>> endpoint (not at this snapshot)
-  API --> DB : events.status planning -> awaiting_safety_check
+== Safety Officer queue and decision (SG2-91/92) ==
+SO -> WEB : open Safety Officer desk
+WEB -> API : GET /api/safety-checks [safety_checks.read]
+API -> DB : safetyChecksStore.list(): events awaiting the check, oldest first, with safety_check_revision
+API --> WEB : {events}
+SO -> WEB : Approve / Reject / Request Changes (reason; arrangements named for Request Changes)
+WEB -> API : POST /api/event-requests/:eventId/safety-decision\n{decision, reason, arrangements, expected_revision} [event_request.safety_decision.record]
+API -> API : validateSafetyDecision (Reject and Request Changes need a reason;\nRequest Changes names venue / equipment / other)
+API -> DB : rpc record_safety_decision(p_event_id, p_actor_id, p_decision, p_reason, p_arrangements, p_expected_revision)
+DB -> DB : actor holds safety_officer; status = awaiting_safety_check (else 'closed');\nsafety_check_revision = expected (else 'stale'); insert event_safety_decisions (append-only)
+alt approve
+  DB -> DB : status -> preparation (safety_approval_gate admits only an Approve decided during this wait)
+else reject
+  DB -> DB : status -> safety_rejected
+else request_changes (SG2-93)
+  DB -> DB : status -> planning; key safety_venue_recheck / safety_equipment_recheck /\nsafety_other_recheck outstanding for each named arrangement;\nlive venue / equipment requests of the named kinds flagged in safety_rereviews
 end
-group <<planned>> SG2-92 record safety decision
-  SO --> WEB : review event, venues, equipment placements
-  WEB --> API : <<planned>> decision endpoint
-  alt pass
-    API --> DB : awaiting_safety_check -> preparation
-  else fail
-    API --> DB : awaiting_safety_check -> safety_rejected
-  else returned for changes
-    API --> DB : awaiting_safety_check -> planning
-  end
+DB -> DB : history rows (safety_decision, status); notify Organiser + Coordinator (safety_decision)
+DB --> API : {outcome:'ok', status} (or forbidden / missing / closed / stale / invalid)
+API --> WEB : decision recorded, or refused
+
+== Request Changes: confirm again, settle, return to the check (SG2-93) ==
+STAFF -> WEB : open safety re-review queue
+WEB -> API : GET /api/safety-rereviews [safety_rereviews.read]
+STAFF -> WEB : confirm a flagged request again
+WEB -> API : POST /api/safety-rereviews/:reviewId/confirm [safety_rereviews.confirm]
+API -> DB : rpc confirm_safety_rereview(p_review_id, p_actor_id, p_acting_role)
+DB -> DB : flag resolved 'confirmed', history; settle_safety_rechecks settles the venue / equipment key\nwhen its last flag closes (a flagged request withdrawn, released or rejected also closes it)
+EC -> WEB : mark other safety changes done
+WEB -> API : POST /api/event-requests/:eventId/rechecks/:key/settle [event_request.rechecks.settle]
+API -> DB : rpc settle_arrangement_recheck(p_event_id, p_actor_id, p_key)
+DB -> DB : last outstanding key settled -> safety_check_refresh on events\n-> awaiting_safety_check once everything is ready
+
+== Reject: rework and resubmit (SG2-92 AC4) ==
+EC -> WEB : rework a Safety Rejected event
+WEB -> API : POST /api/event-requests/:eventId/rework [event_request.safety_rework]
+API -> DB : rpc rework_safety_rejected_event(p_event_id, p_actor_id)
+DB -> DB : assigned coordinator; status = safety_rejected (else 'closed');\nstatus -> planning; safety_other_recheck outstanding; history
+note right of DB : The coordinator fixes the arrangements, then settles safety_other_recheck\n(as above); the refresh trigger resubmits the event for a new check.
+
+== Preparation gate and confirmation (SG2-94, SG2-58) ==
+EC -> WEB : confirm event
+WEB -> API : PATCH /api/event-requests/:eventId/confirm [event_request.confirm]
+API -> DB : rpc confirm_event(p_event_id) (caller JWT)
+DB -> DB : acting role event_coordinator, assigned; status in approved, planning, awaiting_safety_check,\nsafety_rejected, preparation (else 'closed'); readiness: venue, equipment, registration recheck,\nand safety (event_safety_approved: in preparation/confirmed and latest decision is Approve)
+alt anything outstanding (incl. safety)
+  DB --> API : {outcome:'outstanding', outstanding:[...]}
+else event in preparation and nothing outstanding
+  DB -> DB : status preparation -> confirmed; confirmed_by/at; history; notify Organiser (event_confirmed)
+  DB --> API : {outcome:'ok', status:'confirmed'}
 end
-group <<planned>> SG2-93 / SG2-94
-  API --> EC : <<planned>> notify outcome / follow-up (scope per Jira)
-end
-note over EC, DB : After preparation: built — PATCH /api/event-requests/:eventId/confirm -> rpc confirm_event (preparation -> confirmed, SG2-58).
+note over EC, DB : Any way back to Planning (accepted significant change, unavailable venue, venue cancelled or changed)\nwithdraws the approval: the event must pass the check again (SG2-94 AC3).
 
 legend right
   |= Colour |= Meaning |
   |<#FFF4CC>| <<Week 7>> addition |
-  |<#DDDDDD>| <<planned>> not built (dashed) |
+endlegend
+@enduml
+
+@startuml seq-6-registration-waiting-list-withdrawal
+title Seq 6 — Attendee registers, joins the waiting list when full, is offered a freed place, withdraws (SG2-59/60/61/62/63)\nas of main 4881413 (3 Nov 2026)
+skinparam sequenceMessageAlign left
+skinparam noteBackgroundColor #FFF4CC
+actor "Attendee" as ATT
+actor "Event Organiser" as ORG
+participant "Web App" as WEB
+participant "API\nregistrableEventsRouter /\nmyRegistrationsRouter /\nregistrationHandlers" as API
+database "Supabase Postgres" as DB
+participant "pg_cron job\nwaiting-list-offers\n(* * * * *)" as CRON
+
+== Find events open for registration (SG2-59) ==
+ATT -> WEB : open Find events
+WEB -> API : GET /api/registrable-events, GET /api/registrable-events/:eventId [events.registrable.read]
+API -> DB : rpc registrable_events() / registrable_event(p_event_id) (caller JWT)
+DB --> API : confirmed events that need registration, window set and not closed, starting later;\nper caller: registered, full, waiting position
+API --> WEB : 200 {events}
+
+== Register (SG2-60) ==
+ATT -> WEB : register (contact phone, optional needs)
+WEB -> API : POST /api/registrable-events/:eventId/registrations [events.register]
+API -> DB : rpc register_for_event(p_event_id, p_contact_phone, p_needs) (caller JWT)
+DB -> DB : acting role = attendee; phone = 8 Singapore digits, needs <= 500 characters;\nlock the event row; event confirmed with its registration window set
+alt already registered / window closed / not yet open
+  DB --> API : duplicate / closed / not_open
+  API --> WEB : 409 with the reason
+else places held >= registration_capacity (private.places_held)
+  DB --> API : {outcome:'full'}
+  API --> WEB : 409 'full'; the attendee may join the waiting list
+else a place is free
+  DB -> DB : insert registrations (status 'registered'); the attendee's waiting_list_entries row -> registered;\nnotify the attendee (registration_confirmed)
+  opt this registration took the last place (SG2-61 AC3)
+    DB -> DB : notify Organiser + Coordinator (registration_full)
+  end
+  DB --> API : {outcome:'ok', registration}
+  API --> WEB : 201
+end
+
+== Event full: waiting list (SG2-61) ==
+ATT -> WEB : join waiting list
+WEB -> API : POST /api/registrable-events/:eventId/waiting-list [events.register]
+API -> DB : rpc join_waiting_list(p_event_id)
+DB -> DB : lock the event row; one active entry per attendee; places still free -> 'not_full'
+DB -> DB : insert waiting_list_entries (status 'waiting', first come first served)
+DB --> API : {outcome:'ok', waiting:{position}}
+API --> WEB : 201
+ATT -> WEB : leave waiting list (any time)
+WEB -> API : DELETE /api/registrable-events/:eventId/waiting-list
+API -> DB : rpc leave_waiting_list(p_event_id)
+DB -> DB : entry -> left; an offer they held passes to the next attendee (private.offer_waiting_places)
+
+== Withdraw and the freed place (SG2-62) ==
+ATT -> WEB : open My registrations, confirm withdrawal
+WEB -> API : GET /api/my-registrations [registrations.mine.read]\nPOST /api/my-registrations/:registrationId/withdrawal [registrations.withdraw]
+API -> DB : rpc my_registrations() / withdraw_registration(p_registration_id) (caller JWT)
+DB -> DB : lock event, then registration; refused as withdrawn / cancelled event / started\n(now >= proposed_date or event completed)
+DB -> DB : registrations.status -> 'cancelled', withdrawn_at; notify Organiser + Coordinator\n(registration_withdrawn, places remaining)
+DB -> DB : private.offer_waiting_places: the first 'waiting' entry -> 'offered' until\nleast(now + waiting_list_response_hours, registration close, event start); notify (waiting_list_offer)
+DB --> API : {outcome:'ok', registration:{withdrawn_at}}
+API --> WEB : 200
+note right of DB : The offered attendee takes the place with register_for_event (their entry -> registered).\nAn offer that is not taken, or whose registration can no longer be taken, becomes 'lapsed'.
+
+== Offers lapse on schedule (SG2-62 AC6) ==
+loop each minute
+  CRON -> DB : select public.process_waiting_list_offers()
+  DB -> DB : offers past offer_expires_at (or event no longer confirmed / registration closed) -> 'lapsed';\nnotify the attendee (waiting_list_offer_lapsed) only when the time ran out;\nthe place goes to the next waiting attendee
+end
+note right of CRON #FFF4CC : runs inside Supabase, not in the API (202610280001_waiting_list.sql)
+
+== Organiser sees registrations and sets registration (SG2-63) ==
+ORG -> WEB : open registrations of their event
+WEB -> API : GET /api/event-requests/:eventId/registrations [event_request.registrations.view]
+API -> DB : rpc event_registration_overview(p_event_id) (registrations and waiting list)
+ORG -> WEB : set capacity, opening / closing time, waiting-list response hours, or close now
+WEB -> API : PATCH /api/event-requests/:eventId/registration-settings\nPOST /api/event-requests/:eventId/registration-settings/close [event_request.registration_settings.update]
+API -> DB : rpc update_registration_settings(p_event_id, p_actor_id, p_values, ...)
+DB -> DB : validate; one history row per setting changed; announce the window;\nplaces freed by a higher capacity are offered to the waiting list first
+
+legend right
+  |= Colour |= Meaning |
+  |<#FFF4CC>| <<Week 7>> addition |
+endlegend
+@enduml
+
+@startuml seq-7-change-request-and-attendee-notice
+title Seq 7 — Organiser asks for a change after submitting; Coordinator decides; attendees are told (SG2-64/65/66/102)\nas of main 4881413 (3 Nov 2026)
+skinparam sequenceMessageAlign left
+skinparam noteBackgroundColor #FFF4CC
+actor "Event Organiser" as ORG
+actor "Assigned Coordinator" as EC
+actor "Registered Attendee" as ATT
+participant "Web App" as WEB
+participant "API\nchangeRequestHandlers" as API
+database "Supabase Postgres" as DB
+
+== Raise (SG2-64) ==
+ORG -> WEB : ask for a change: one field, new value, reason
+WEB -> API : POST /api/event-requests/:eventId/change-requests\n{field, to, reason} [event_request.change_request.raise]
+API -> DB : rpc raise_event_change_request(p_event_id, p_actor_id, p_field, p_to_value, p_reason)
+DB -> DB : actor is an Organiser of this organisation who created the event; lock the event row;\nrefused on draft / cancelled / rejected / completed; unchanged value refused
+DB -> DB : insert event_change_requests (status 'pending', from_value captured now);\nnotify the assigned Coordinator (change_requested)
+DB --> API : {outcome:'ok', request}
+API --> WEB : 201 {change_request, coordinator_notified}
+note right of DB : Raising changes no event status.
+
+== Coordinator sees the impact (SG2-66) ==
+EC -> WEB : open the event's change requests
+WEB -> API : GET /api/event-requests/:eventId/change-requests [event_request.change_request.view]
+API -> DB : fetchChangeImpactFacts: confirmed bookings, equipment reservations, registrations
+API --> WEB : each pending request with what it would break (assessChangeImpact)
+
+== Accept (SG2-66 / SG2-65) ==
+EC -> WEB : accept
+WEB -> API : POST /api/event-requests/:eventId/change-requests/:changeRequestId/accept\n[event_request.change_request.accept]
+alt event in needs_clarification
+  API -> DB : rpc decide_event_change_request(... 'accepted', p_next 'review' | 'resubmit')
+  DB -> DB : write the new value onto the event request; history; request accepted, decided_by/at;\nnext = 'review': status needs_clarification -> under_review; notify the Organiser (change_accepted)
+  API --> WEB : 200 {status: under_review | needs_clarification}
+else event in approved, planning, awaiting_safety_check, preparation or confirmed
+  API -> API : validatePlanningSchedule; assessChangeImpact -> outstanding recheck keys
+  API -> DB : rpc apply_accepted_event_change(p_event_id, p_actor_id, p_expected_status,\np_change_reference, p_changes, p_outstanding)
+  DB -> DB : apply whitelisted fields, one history row each; recheck keys outstanding;\nrecheck on Approved / Awaiting Safety Check / Preparation / Confirmed -> status planning;\nsignificant change on Preparation / Confirmed -> planning, safety approval withdrawn (SG2-94 AC3)
+  opt returned to planning
+    DB -> DB : notify Organiser + Coordinator (event_returned_to_planning)
+  end
+  API -> DB : rpc decide_event_change_request(... 'accepted')
+  DB -> DB : request accepted, decided_by/at; notify the Organiser (change_accepted)
+  API --> WEB : 200 {status, returned_to_planning, outstanding_arrangements}
+else any other status
+  API --> WEB : 409 not changeable
+end
+
+== Refuse (SG2-65) ==
+EC -> WEB : refuse with a reason
+WEB -> API : POST .../change-requests/:changeRequestId/refuse {reason} [event_request.change_request.refuse]
+API -> DB : rpc decide_event_change_request(... 'refused', p_reason)
+DB -> DB : request refused (reason, decided_by/at); history; event left as it is; notify the Organiser (change_refused)
+
+== Attendees are told (SG2-102) ==
+note over DB, ATT : At commit, constraint triggers event_attendee_details_changed (events.proposed_date) and\nvenue_booking_attendee_details_changed (venue_bookings) compare the event's start and confirmed venues\nwith private.event_attendee_details.
+DB -> DB : announce_event_attendee_details: if the start or the confirmed venues differ and the event is not cancelled
+DB -> ATT : one notification 'event_changed' per active registration (old -> new date/time and venue)
+note right of DB : Catches every writer: an accepted change, a replacement venue (add + release = one notice),\na venue changed or cancelled (SG2-83). Attendance, requirements, layout and booking times never notify.
+
+legend right
+  |= Colour |= Meaning |
+  |<#FFF4CC>| <<Week 7>> addition |
+endlegend
+@enduml
+
+@startuml seq-8-event-cancellation
+title Seq 8 — Organiser asks to cancel an event; Coordinator carries it out (SG2-67, SG2-56)\nas of main 4881413 (3 Nov 2026)
+skinparam sequenceMessageAlign left
+skinparam noteBackgroundColor #FFF4CC
+actor "Event Organiser" as ORG
+actor "Assigned Coordinator" as EC
+actor "Registered Attendee" as ATT
+participant "Web App" as WEB
+participant "API\ncancellationHandlers" as API
+database "Supabase Postgres" as DB
+
+== Organiser asks (SG2-67 AC1) ==
+ORG -> WEB : cancel event, with a reason (up to 500 characters)
+WEB -> API : POST /api/event-requests/:eventId/cancellation-request {reason}\n[event_request.cancellation.request]
+API -> DB : rpc request_event_cancellation(p_event_id, p_reason) (caller JWT)
+DB -> DB : acting role = event_organiser; lock the event row; creator of the event (else 'missing');\nstatus draft / completed / cancelled / rejected -> 'closed'; already asked -> 'requested'
+DB -> DB : cancellation_requested_at/by/reason on the event; history (cancellation_request);\nnotify the assigned Coordinator (cancellation_requested)
+DB --> API : {outcome:'ok', coordinator_notified}
+API --> WEB : 200
+note right of DB : The status is unchanged until the Coordinator acts.
+
+== Coordinator carries it out (SG2-67 AC1-AC5) ==
+EC -> WEB : cancel the event (action hidden once the event is closed, #124)
+WEB -> API : PATCH /api/event-requests/:eventId/cancel [event_request.cancel]
+API -> DB : rpc cancel_event(p_event_id) (caller JWT)
+DB -> DB : acting role = event_coordinator; lock venues, bookings, then the event;\nnot the assigned coordinator -> 'missing'; completed / cancelled / rejected -> 'closed';\nno cancellation request -> 'not_requested'
+DB -> DB : release every held/confirmed venue booking that has not ended (its approved request -> cancelled);\nrelease tentative holds (their requests -> cancelled); cancel other pending venue and equipment requests
+DB -> DB : events.status -> cancelled (cancelled_at/by, venue_booking_id cleared); history
+DB -> DB : trigger release_cancelled_event_equipment (SG2-56): reservations released, one history entry each
+DB -> DB : notify each registered attendee once and the Organiser (event_cancelled)
+DB -> ATT : notification 'event_cancelled' with the reason
+DB --> API : {outcome:'ok', status:'cancelled', bookings_released, attendees_notified}
+API --> WEB : 200
+note right of DB : keep_cancelled_events_cancelled refuses any later status change (AC5).\nWithdrawal, registration, change requests and planning edits are refused on a cancelled event.
+
+legend right
+  |= Colour |= Meaning |
+  |<#FFF4CC>| <<Week 7>> addition |
 endlegend
 @enduml

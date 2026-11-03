@@ -70,8 +70,8 @@ current scenario; the current specification is authoritative.
 | FE-UI-01 | PW-AUTH-01 covers all seeded role landings; detailed navigation matrix remains supporting frontend coverage. |
 | FE-UI-02 | SG2-28-P01, SG2-29-P01 and SG2-32-P01 cover implemented request journeys; prototype-only review/amend assertions remain supporting frontend scope. |
 | FE-UI-03 | SG2-42-P01 and SG2-44-P01 cover venue maintenance and API-backed fixture calendar; prototype handoff remains supporting scope. |
-| FE-UI-04 | Prototype equipment reservation remains supporting frontend scope; no durable equipment acceptance claim is introduced. |
-| FE-UI-05 | Prototype attendee registration/withdrawal remains supporting frontend scope; no persisted attendee workflow claim is introduced. |
+| FE-UI-04 | Prototype equipment reservation remains supporting frontend scope; no durable equipment acceptance claim is introduced. Since superseded: reservation is persisted and covered by SG2-55-C01. |
+| FE-UI-05 | Prototype attendee registration/withdrawal remains supporting frontend scope; no persisted attendee workflow claim is introduced. Since superseded: registration and withdrawal are persisted and covered by SG2-60-P01 and SG2-62-P01. |
 | FE-HEALTH-01 | Health-success UI remains a supporting frontend check. |
 | FE-HEALTH-02 | HTTP failure UI remains a supporting frontend check. |
 | FE-HEALTH-03 | Structured/unstructured network failure UI remains supporting frontend checks. |

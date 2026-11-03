@@ -8,6 +8,8 @@ SG2-96 requires the full Week 7 journey and regression results after the Week 7 
 
 **Date:** 26 Oct 2026 (Asia/Singapore).
 
+> Note (3 Nov 2026): this record covers the 26 Oct tree only. SG2-59, 61, 62, 65, 102 and the other remaining Sprint 4 stories merged afterwards (main 4881413); no result below was re-run on that commit.
+
 **Rerun environment:** macOS, Node **24.10.0**, Playwright Chromium, disposable Docker **PostgreSQL 17** and **PostgREST 12.2.12**. Database checks replayed the current CI workflow against disposable databases. This differs from the earlier Linux/PostgreSQL 16 capacity benchmark, which remains a separate recorded run in [`nfr-capacity-review.md`](nfr-capacity-review.md).
 
 **Hosted CI evidence: pending.** After the final changes are committed, **Build and test** generates a `regression-evidence-<run ID>-<attempt>` artifact with the exact checked-out SHA, UTC date, real run-attempt link and every required job result. Copy that verified record here and into the Managing Changes guide before its 14-day retention expires; see [`ci.md`](ci.md#regression-evidence-sg2-96). Do not substitute the base commit's run for the final branch.

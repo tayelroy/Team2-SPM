@@ -149,15 +149,16 @@ for a coordinator" — through `GET /api/notifications`. The rows are still
 limited to the caller by the handler and by the `notifications` RLS policy;
 the grant only lets the Lead ask. The Lead's header shows the same bell as the
 organiser's, without hold notices (the Lead holds no `venues.holds.read`). The
-Safety Officer receives no notices yet and keeps the placeholder bell, without
-the grant. See [notifications](notifications.md).
+Safety Officer does not hold the grant and receives no notices (SG2-92 notifies the
+organiser and coordinator instead). See [notifications](notifications.md).
 
 In the client, each role reaches only its own functions (SG2-86 AC2). The
 Event Coordinator Lead's desk shows a live count of the unassigned queue
 (`GET /api/assignment-queue`) with a way into it, and its primary action is
-**Assign coordinators**. The Safety Officer's desk is an empty state until
-the safety review flow adds safety checks. Neither desk shows prototype events
-or opens an Attendee screen. Neither role holds `event_request.view`, so
+**Assign coordinators**. The Safety Officer's desk links to **Safety checks**
+(`safety_checks.read`, SG2-91), the events awaiting the operational safety check
+where the Safety Officer records Approve, Reject or Request Changes (SG2-92, SG2-93).
+Neither desk opens an Attendee screen. Neither role holds `event_request.view`, so
 neither is offered **All events**, which is only for Event Organisers.
 
 Navigation items can name the permission their screen needs (`NavEntry` in
@@ -166,10 +167,12 @@ Navigation items can name the permission their screen needs (`NavEntry` in
 valid), and `navFor` shows a gated item only when `can()` from
 `client/src/auth/access.ts` confirms the grant. The Lead's **Unassigned queue**
 (`event_request.queue.view`) and **Assign coordinators**
-(`event_request.assign_coordinator`) are gated this way. While permissions are
-loading the header `<nav>` has `aria-busy="true"`, and gated items stay hidden
-if the permissions cannot be loaded. The five existing roles' menus have no
-gated items, so they are unchanged (AC4). The server still enforces every
+(`event_request.assign_coordinator`) are gated this way, as are **Safety checks**,
+**Coordinator overview**
+(`event_request.oversight.view`), **Capacity exceptions**, **Find an event**
+(`events.search`) and the Attendee's **Find events** and **My registrations**. While
+permissions are loading the header `<nav>` has `aria-busy="true"`, and gated items
+stay hidden if the permissions cannot be loaded. The server still enforces every
 route; hiding a menu item is not access control.
 
 Permissions map an action name to the roles allowed to perform it. Define them

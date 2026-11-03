@@ -106,9 +106,9 @@ and action that moves it forward:
    the server re-checks ownership, status and the end time on every call.
 
 `cancelled` and `rejected` are terminal off-stepper outcomes, same as
-`completed`. The legal transition table enforcing which of these moves are
-allowed lives in `server/src/events/fields.ts` (`STATUS_TRANSITIONS`,
-`canTransition`).
+`completed`. There is no single transition table in the code: each writer of
+`events.status` checks the statuses it accepts, and the database enforces
+`safety_approval_gate` and `keep_cancelled_events_cancelled`.
 
 ## Who an event is waiting on (SG2-38, SG2-31)
 

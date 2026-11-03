@@ -1,12 +1,13 @@
-' ConnectSphere physical data model (SG2-95), as of PR90 head 61416cc (16 Oct 2026).
-' Final state of public schema after every file in supabase/migrations/, in order.
-' 24 tables in four areas; each diagram block renders to its own page.
-' Week 7 tables/columns are tagged with the migration that added them.
+' ConnectSphere physical data model (SG2-95), as of main 4881413 (3 Nov 2026).
+' Final state of public schema after every file in supabase/migrations/ (through 202610310001), in order.
+' 30 public tables plus private.event_attendee_details, in six areas; each diagram block renders to its own page.
+' Week 7 tables/columns are highlighted and tagged with the migration that added them;
+' later backlog migrations are tagged with their migration and story id.
 ' Sources per element: docs/design/model-notes.md.
 
 @startuml er-events-people
 !pragma layout smetana
-title ConnectSphere data model (1/4): events & people (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere data model (1/6): events & people (public schema)\nas of main 4881413 (3 Nov 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -45,12 +46,14 @@ entity users {
 
 entity account_roles {
   * user_id : uuid <<PK>> <<FK auth.users>>
-  --
-  * role : text  CHECK in (event_organiser,
+  * role : text <<PK>> CHECK in (event_organiser,
       event_coordinator, venue_staff,
       technical_support_staff, attendee,
   <back:#FFF4CC>    event_coordinator_lead, safety_officer)</back>
   <back:#FFF4CC>«W7 202610050004_week7_roles»</back>
+  .. 202610180001 (SG2-104): one row per role held; ..
+  .. key widened from (user_id) to (user_id, role) ..
+  .. index (role, user_id) ..
 }
 
 entity events {
@@ -58,18 +61,25 @@ entity events {
   --
   * organiser_id : uuid <<FK users>>
   coordinator_id : uuid <<FK users>>
+  <back:#FFF4CC>coordinator_assigned_by : uuid <<FK users>> «W7 202610220004»</back>
   organisation : varchar(255)
   name : varchar(255)
   purpose, description : text
   proposed_date : timestamptz
   expected_attendance : integer
   venue_requirements, accessibility_needs : text
+  preferred_layout : text  (<= 5000) «202610200001 SG2-105»
+  <back:#FFF4CC>expected_crowd_movement : text (<= 5000) «W7 SG2-91»</back>
   equipment_requirements : text
+  category : text  CHECK in (conference, workshop, seminar,
+      training, networking, social, other)  «202610200005»
   registration_needed : boolean
   * status : event_status = 'draft'
   venue_booking_id : integer <<FK venue_bookings>>
   registration_capacity : integer  CHECK > 0
   registration_opens_at, registration_closes_at : timestamptz
+  registration_announced : text  CHECK in (open, closed)  «202610200004»
+  * waiting_list_response_hours : integer = 24  CHECK 1..168  «202610280001»
   planning_notes : text
   * arrangements_recheck_needed : boolean = false
   * outstanding_arrangements : jsonb = '[]'
@@ -82,13 +92,22 @@ entity events {
   confirmed_by : uuid <<FK users>>
   confirmed_at : timestamptz
   .. 202610160005 additive confirmation-column repair ..
+  <back:#FFF4CC>awaiting_safety_check_since : timestamptz «W7 SG2-91»</back>
+  * <back:#FFF4CC>safety_check_revision : bigint = 0 «W7 SG2-91»</back>
+  cancellation_requested_at, cancelled_at : timestamptz
+  cancellation_reason : text  (<= 500)
+  cancellation_requested_by, cancelled_by : uuid
+      <<FK users>> set null  «202610220002 SG2-67»
   .. checks ..
   closes_at > opens_at; rejected => decision_reason;
   by/at pairs recorded together (decided, completed,
-  confirmed); completed => completed_at
+  confirmed); completed => completed_at;
+  coordinator_id <> organiser_id; assigned_by => coordinator_id;
+  cancellation requested_at <=> reason; cancelled_at => cancelled
   .. indexes ..
   (organisation); (coordinator_id, status);
   <back:#FFF4CC>(submitted_at, event_id) WHERE unassigned</back>
+  <back:#FFF4CC>(coordinator_assigned_by) WHERE not null</back>
 }
 
 entity event_audit_logs {
@@ -111,21 +130,13 @@ entity event_clarifications {
   * created_at : timestamptz = now()
 }
 
-entity registrations {
-  * registration_id : serial <<PK>>
-  --
-  * event_id : integer <<FK events>> cascade
-  * attendee_id : uuid <<FK users>>
-  status : varchar(50)
-}
-
 entity "venue_bookings" as vb_ref <<ref>> {
   * booking_id : bigserial <<PK>>
   .. page 2 ..
 }
 
 auth_users ||--o| users
-auth_users ||--o| account_roles
+auth_users ||--o{ account_roles
 roles ||--o{ users
 users ||--o{ events : organiser_id
 users |o--o{ events : coordinator_id
@@ -133,25 +144,32 @@ events ||--o{ event_audit_logs
 users |o--o{ event_audit_logs : actor_id
 events ||--o{ event_clarifications
 users ||--o{ event_clarifications : sender_id
-events ||--o{ registrations
-users ||--o{ registrations : attendee_id
 vb_ref |o--o{ events : venue_booking_id (first venue)
 
 legend bottom left
   |= Marker |= Meaning |
   | ● (source *) | NOT NULL |
   |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  Migration tags without W7 (e.g. 202610260002 SG2-96) = later backlog stories, not Week 7 changes.
   |<back:#E8F0FE> <<ref>> </back>| defined on another page / outside public |
   enum event_status: draft, submitted, under_review, approved, planning,
   confirmed, completed, cancelled, rejected, needs_clarification (202609300001),
   <back:#FFF4CC>unassigned, awaiting_safety_check, safety_rejected, preparation «W7 202610090001»</back>
-  events.decided_by / completed_by / confirmed_by -> users: lines omitted.
+  events.decided_by / completed_by / confirmed_by / coordinator_assigned_by /
+  cancellation_requested_by / cancelled_by -> users: lines omitted.
+  registrations and waiting_list_entries: page 5. event_change_requests,
+  event_safety_decisions, safety_rereviews: page 6.
+  Triggers on events: safety_check_track_event, safety_check_refresh, safety_approval_gate
+  (SG2-91/94, W7), release_cancelled_event_equipment, keep_cancelled_events_cancelled,
+  deferred event_attendee_details_changed.
+  Views: internal_work_items (work queue; replaced in 202610190004, 202610200001,
+  202610220002, 202610220004).
 endlegend
 @enduml
 
 @startuml er-venues-availability
 !pragma layout smetana
-title ConnectSphere data model (2/4): venues, availability & bookings (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere data model (2/6): venues, availability & bookings (public schema)\nas of main 4881413 (3 Nov 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -176,6 +194,14 @@ entity venues {
   facilities : text
   accessibility_features : text
   operating_information : text
+  <back:#FFF4CC>deleted_at : timestamptz «W7 202610170007 (SG2-106)»</back>
+  <back:#FFF4CC>deleted_by : uuid <<FK users>> (pair with deleted_at)</back>
+  .. indexes ..
+  <back:#FFF4CC>(name, venue_id) WHERE deleted_at IS NULL</back>
+  .. triggers ..
+  <back:#FFF4CC>venues_guard_deleted: deleted venue read-only; delete only</back>
+  <back:#FFF4CC>through delete_venue(); *_refuse_deleted on requests,</back>
+  <back:#FFF4CC>bookings, holds, unavailability</back>
 }
 
 entity venue_layouts {
@@ -195,6 +221,9 @@ entity venue_operations <<Week 7>> {
   updated_by : uuid <<FK users>>
   * updated_at : timestamptz = now()
   .. «W7 202610050003_venue_operations (SG2-77)» ..
+  .. triggers (202610170006) ..
+  venue_operations_stamp_change: sets updated_by / updated_at
+  venue_operations_record_change: writes venue_operation_history
 }
 
 entity venue_operation_history <<Week 7>> {
@@ -245,6 +274,8 @@ entity venue_bookings {
   EXCLUDE gist (venue_id =, tstzrange &&)
     WHERE status = 'confirmed'
   cancelled <=> cancelled_at; cancelled => reason
+  .. indexes ..
+  (event_id) «202610260002 SG2-96»
 }
 
 entity venue_booking_clashes <<Week 7>> {
@@ -272,6 +303,7 @@ legend bottom left
   |= Marker |= Meaning |
   | ● (source *) | NOT NULL |
   |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  Migration tags without W7 (e.g. 202610260002 SG2-96) = later backlog stories, not Week 7 changes.
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
   enum venue_layout: classroom, theatre, boardroom, banquet, exhibition, other.
   Actor columns (*_by) reference users.user_id (venue_unavailability.created_by:
@@ -282,7 +314,7 @@ endlegend
 
 @startuml er-requests-holds
 !pragma layout smetana
-title ConnectSphere data model (3/4): venue requests, capacity exceptions & holds (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere data model (3/6): venue requests, capacity exceptions & holds (public schema)\nas of main 4881413 (3 Nov 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -328,9 +360,17 @@ entity venue_booking_requests {
   <back:#FFF4CC>withdrawn_by : uuid <<FK users>> set null</back>
   <back:#FFF4CC>withdrawn_at : timestamptz  (=> status cancelled)</back>
   <back:#FFF4CC>«W7 202610150002_venue_request_withdrawal»</back>
+  <back:#FFF4CC>change_reason : text  (<= 500; only if replaces_booking_id)</back>
+  <back:#FFF4CC>«W7 202610210002_venue_booking_change_cancel (SG2-83)»</back>
   .. constraints ..
   EXCLUDE gist (event_id =, venue_id =, tstzrange &&)
     WHERE pending/approved and requested_by not null
+  .. indexes ..
+  (event_id) «202610260002 SG2-96»
+  .. triggers ..
+  <back:#FFF4CC>venue_change_request_check (before insert),</back>
+  <back:#FFF4CC>venue_change_requested (notifies Venue Staff),</back>
+  <back:#FFF4CC>safety_rereview_close, safety_check_refresh</back>
 }
 
 entity venue_capacity_exceptions {
@@ -360,6 +400,8 @@ entity venue_holds <<Week 7>> {
   * created_by : uuid <<FK users>>
   * created_at : timestamptz = clock_timestamp()
   warning_sent_at : timestamptz
+  <back:#FFF4CC>* expiry_revision : integer = 0</back>
+  <back:#FFF4CC>«W7 202610170007 (SG2-106)», +1 per expiry change</back>
   .. checks ..
   ends > starts; expires_at > created_at;
   converted <=> booking_id not null
@@ -372,10 +414,17 @@ entity venue_hold_notifications <<Week 7>> {
   * recipient_id : uuid <<FK users>>
   * event_id : integer <<FK events>> cascade
   * hold_id : bigint <<FK venue_holds>> cascade
-  * kind : text  CHECK in (placed, warning, expired)
+  * kind : text  CHECK in (placed, warning, expired,
+  <back:#FFF4CC>    expiry_changed «W7 202610170007»)</back>
   * message : text
   * created_at : timestamptz = clock_timestamp()
-  UNIQUE (hold_id, recipient_id, kind)
+  <back:#FFF4CC>* expiry_revision : integer = 0 «W7 202610170007»</back>
+  <back:#FFF4CC>read_at : timestamptz «202610200003 SG2-69»</back>
+  UNIQUE (hold_id, recipient_id, kind, expiry_revision)
+      (was (hold_id, recipient_id, kind) until 202610170007)
+  .. indexes ..
+  (recipient_id) WHERE read_at IS NULL;
+  (recipient_id, created_at DESC, notification_id DESC)
   .. «W7 202610050001» ..
 }
 
@@ -403,18 +452,20 @@ legend bottom left
   |= Marker |= Meaning |
   | ● (source *) | NOT NULL |
   |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  Migration tags without W7 (e.g. 202610260002 SG2-96) = later backlog stories, not Week 7 changes.
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
   Actor columns (*_by, recipient_id) reference users.user_id: lines omitted.
   venue_hold_settings is a single-row table read by the hold functions.
   pg_cron job 'venue-hold-deadlines' (* * * * *) runs process_venue_hold_deadlines():
-  expires holds and sends the 'warning' notice warning_lead_seconds (24 h) ahead.
+  expires holds and sends the 'warning' notice warning_lead_seconds (24 h) ahead;
+  change_venue_hold_expiry() (SG2-106) starts a new notice round (expiry_revision).
   View: internal_work_items (work queue over requests).
 endlegend
 @enduml
 
 @startuml er-equipment-notifications
 !pragma layout smetana
-title ConnectSphere data model (4/4): equipment & notifications (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere data model (4/6): equipment & notifications (public schema)\nas of main 4881413 (3 Nov 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -470,6 +521,11 @@ entity equipment_requests {
   placement_venue_id : integer <<FK venues>>
   placement_position : text  (pair with venue)
   * version : bigint = 1
+  .. indexes ..
+  (event_id) «202610260002 SG2-96»
+  .. rule (202610290003, in manage_equipment_requirements) ..
+  placement venue must have a pending/approved request or a
+  confirmed booking for the same event
 }
 
 entity equipment_reservations {
@@ -481,7 +537,16 @@ entity equipment_reservations {
   starts_at, ends_at : timestamptz  (both or neither)
   request_id : bigint <<UQ>> <<FK equipment_requests>>
   reserved_at : timestamptz
-  .. index (equipment_id, event_id) ..
+  released_at : timestamptz
+  released_by : uuid <<FK users>> set null
+  release_reason : text  (1..500)
+      «202610210001_equipment_release (SG2-56)»
+  .. checks ..
+  released_at <=> release_reason
+  .. indexes ..
+  (equipment_id, event_id); (event_id) «202610260002 SG2-96»
+  .. triggers ..
+  release_cancelled_event_equipment: on events.status -> cancelled
 }
 
 entity notifications {
@@ -492,18 +557,32 @@ entity notifications {
   request_id : bigint <<FK venue_booking_requests>> cascade
   equipment_reservation_id : integer
       <<FK equipment_reservations>> cascade
-  * kind : text  CHECK in (venue_request_approved,
-      venue_request_rejected, venue_booking_released,
-      equipment_reserved,
-  <back:#FFF4CC>    venue_booking_clash «W7 202610140003»,</back>
-      event_confirmed, event_submitted,
-      coordinator_assigned, clarification_requested,
-      event_approved, event_rejected,
-  <back:#FFF4CC>    venue_unavailable «W7 202610170001»</back>)
+  * kind : text  CHECK in (30 kinds, see legend)
   * message : text  (1..2000)
   * created_at : timestamptz = clock_timestamp()
+  read_at : timestamptz  «202610200003 SG2-69»
   UNIQUE (request_id, recipient_id, kind)
   UNIQUE (equipment_reservation_id, recipient_id)
+  .. indexes ..
+  (recipient_id) WHERE read_at IS NULL;
+  (recipient_id, created_at DESC, notification_id DESC)
+}
+
+entity notification_reminder_settings {
+  * user_id : uuid <<PK>> <<FK users>> cascade
+  --
+  * frequency_days : integer = 1  CHECK 1..30
+  .. «202610200003_notifications_inbox_reminders (SG2-69)» ..
+  .. grants to service_role only; coordinator's reminder cadence ..
+}
+
+entity notification_reminder_receipts {
+  * event_id : integer <<PK>> <<FK events>> cascade
+  * recipient_id : uuid <<PK>> <<FK users>> cascade
+  --
+  * last_sent_at : timestamptz
+  .. «202610200003 (SG2-69)», grants to service_role only ..
+  .. written by send_outstanding_arrangement_reminders() ..
 }
 
 ev_ref ||--o{ equipment_requests
@@ -516,14 +595,247 @@ users_ref ||--o{ notifications : recipient_id
 ev_ref |o--o{ notifications
 vbr_ref |o--o{ notifications : request_id
 equipment_reservations |o--o{ notifications : equipment_reservation_id
+users_ref ||--o| notification_reminder_settings : user_id
+ev_ref ||--o{ notification_reminder_receipts
+users_ref ||--o{ notification_reminder_receipts : recipient_id
 
 legend bottom left
   |= Marker |= Meaning |
   | ● (source *) | NOT NULL |
   |<back:#FFF4CC> «W7 migration» </back>| added by a Week 7 migration |
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
-  notifications kind history: 202610060001, 202610100002, 202610140001,
-  202610140003, 202610150001, 202610160001 (SG2-68 event notices).
-  Hold notices live in venue_hold_notifications (page 3).
+  notifications.kind (30), in the order they were added: venue_request_approved,
+  venue_request_rejected, venue_booking_released, equipment_reserved
+  (202610060001-202610140001), venue_booking_clash (W7 202610140003), event_confirmed
+  (202610150001), event_submitted, coordinator_assigned, clarification_requested,
+  event_approved, event_rejected (202610160001), venue_unavailable (W7 202610170001),
+  event_returned_to_planning (202610190003), safety_decision (W7 202610190005),
+  outstanding_arrangements (202610200003), registration_opened, registration_closed
+  (202610200004), venue_booking_cancelled, venue_change_requested (W7 202610210002),
+  cancellation_requested, event_cancelled (202610220002), registration_confirmed
+  (202610230001), change_requested (202610260001), registration_withdrawn
+  (202610260003), change_accepted, change_refused (202610270001), event_changed
+  (202610270002), registration_full, waiting_list_offer, waiting_list_offer_lapsed
+  (202610280001). From 202610200004 each migration appends its kinds to the live check; earlier ones restated the list.
+  Hold notices live in venue_hold_notifications (page 3); the SG2-69 inbox reads both tables.
+  Migration tags without W7 (e.g. 202610200003 SG2-69) = later backlog stories, not Week 7 changes.
+endlegend
+@enduml
+
+@startuml er-registrations
+!pragma layout smetana
+title ConnectSphere data model (5/6): registrations & waiting list (public and private schema)\nas of main 4881413 (3 Nov 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "events" as ev_ref <<ref>> {
+  * event_id : serial <<PK>>
+  .. page 1 ..
+}
+entity "users" as users_ref <<ref>> {
+  * user_id : uuid <<PK>>
+  .. page 1 ..
+}
+
+entity registrations {
+  * registration_id : serial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * attendee_id : uuid <<FK users>>
+  status : varchar(50) = 'registered'
+      ('cancelled' = withdrawn: gives the place back)
+      «202610200004 SG2-63»
+  * registered_at : timestamptz = clock_timestamp()
+      «202610200004 SG2-63»
+  contact_phone : text  CHECK <= 40, 8 Singapore digits,
+      optional +65  «202610230001 SG2-60»
+  needs : text  CHECK <= 500  «202610230001 SG2-60»
+  withdrawn_at : timestamptz  CHECK => status cancelled
+      «202610260003 SG2-62»
+  .. indexes ..
+  (event_id, status) «202610200004»
+  UNIQUE (event_id, attendee_id) WHERE status <> 'cancelled'
+      «202610230001»: one active registration per attendee
+}
+
+entity waiting_list_entries {
+  * entry_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * attendee_id : uuid <<FK users>> cascade
+  * status : text = 'waiting'  CHECK in (waiting, offered,
+      registered, left, lapsed)
+  * joined_at : timestamptz = clock_timestamp()
+  offered_at : timestamptz
+  offer_expires_at : timestamptz
+  ended_at : timestamptz
+  .. checks ..
+  offered => offered_at and offer_expires_at;
+  ended_at null <=> status in (waiting, offered)
+  .. indexes ..
+  UNIQUE (event_id, attendee_id) WHERE status in (waiting, offered)
+  (event_id, joined_at, entry_id) WHERE status in (waiting, offered)
+  .. «202610280001_waiting_list (SG2-61/62)», select granted to service_role only ..
+}
+
+entity "private.event_attendee_details" as ead {
+  * event_id : integer <<PK>> <<FK events>> cascade
+  --
+  proposed_date : timestamptz
+  * venue_ids : integer[] = '{}'
+  venue_names : text
+  .. «202610270002_attendee_event_change_notices (SG2-102)» ..
+  .. no grants or policies: only SECURITY DEFINER functions touch it ..
+}
+
+ev_ref ||--o{ registrations
+users_ref ||--o{ registrations : attendee_id
+ev_ref ||--o{ waiting_list_entries
+users_ref ||--o{ waiting_list_entries : attendee_id
+ev_ref ||--o| ead
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  All tables on this page come from backlog stories after the Week 7 changes (no W7 tint).
+  A place is held by an active registration (status <> 'cancelled') or an unexpired waiting-list offer
+  (private.places_held). Every place-changing function locks the event row first.
+  events.registration_capacity / registration_opens_at / registration_closes_at /
+  registration_announced / waiting_list_response_hours: page 1.
+  pg_cron jobs 'registration-windows' (process_registration_windows) and 'waiting-list-offers'
+  (process_waiting_list_offers) run every minute.
+  After commit, a deferred constraint trigger compares events.proposed_date and the event's
+  confirmed venues with private.event_attendee_details and sends one event_changed notice
+  to each active registration (notifications, page 4).
+endlegend
+@enduml
+
+@startuml er-safety-changes
+!pragma layout smetana
+title ConnectSphere data model (6/6): safety decisions & change requests (public schema)\nas of main 4881413 (3 Nov 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "events" as ev_ref <<ref>> {
+  * event_id : serial <<PK>>
+  .. page 1 ..
+}
+entity "users" as users_ref <<ref>> {
+  * user_id : uuid <<PK>>
+  .. page 1 ..
+}
+entity "venue_booking_requests" as vbr_ref <<ref>> {
+  * request_id : bigserial <<PK>>
+  .. page 3 ..
+}
+entity "equipment_requests" as eqr_ref <<ref>> {
+  * request_id : bigserial <<PK>>
+  .. page 4 ..
+}
+
+entity event_safety_decisions <<Week 7>> {
+  * decision_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * decision : text  CHECK in (approve, reject, request_changes)
+  reason : text  CHECK <= 2000
+  * arrangements : text[] = '{}'  CHECK subset of
+      (venue, equipment, other)
+  * decided_by : uuid <<FK users>>
+  * decided_at : timestamptz = clock_timestamp()
+  .. checks ..
+  request_changes <=> arrangements not empty;
+  reject / request_changes => reason not blank
+  .. indexes ..
+  (event_id, decided_at DESC)
+  .. «W7 202610190005_safety_decisions (SG2-92)» ..
+  .. append-only: select + insert granted to service_role only ..
+}
+
+entity safety_rereviews <<Week 7>> {
+  * review_id : bigint <<PK>> (identity)
+  --
+  * event_id : integer <<FK events>> cascade
+  * decision_id : bigint <<FK event_safety_decisions>> cascade
+  * arrangement : text  CHECK in (venue, equipment)
+  venue_request_id : bigint <<FK venue_booking_requests>> cascade
+  equipment_request_id : bigint <<FK equipment_requests>> cascade
+  * flagged_at : timestamptz = clock_timestamp()
+  resolution : text  CHECK in (confirmed, withdrawn)
+  resolved_by : uuid <<FK users>>
+  resolved_at : timestamptz
+  .. checks ..
+  exactly one request, matching arrangement;
+  resolution <=> resolved_at; confirmed => resolved_by
+  .. indexes ..
+  UNIQUE (venue_request_id) WHERE resolved_at IS NULL;
+  UNIQUE (equipment_request_id) WHERE resolved_at IS NULL;
+  (event_id, review_id)
+  .. «W7 202610240001_safety_changes_requested (SG2-93)» ..
+  .. select, insert, update granted to service_role only ..
+}
+
+entity event_change_requests {
+  * change_request_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * requested_by : uuid <<FK users>>
+  * field : text  CHECK in (proposed_date, expected_attendance,
+      venue_requirements, accessibility_needs,
+      equipment_requirements, name, purpose, description)
+  from_value : jsonb  (value when raised)
+  * to_value : jsonb
+  * reason : text  CHECK not blank, <= 1000
+  * status : text = 'pending'  CHECK in (pending,
+      accepted, refused)
+  * created_at : timestamptz = now()
+  decided_by : uuid <<FK users>>
+  decided_at : timestamptz
+  decision_reason : text  (required when refused, <= 1000)
+      «202610270001_change_request_decisions (SG2-65)»
+  .. checks ..
+  pending <=> decided_by null <=> decided_at null
+  .. indexes ..
+  (event_id, created_at)
+  .. «202610260001_event_change_requests (SG2-64)» ..
+  .. select, insert, update granted to service_role only ..
+}
+
+ev_ref ||--o{ event_safety_decisions
+users_ref ||--o{ event_safety_decisions : decided_by
+event_safety_decisions ||--o{ safety_rereviews
+ev_ref ||--o{ safety_rereviews
+vbr_ref |o--o| safety_rereviews : venue_request_id (open flag)
+eqr_ref |o--o| safety_rereviews : equipment_request_id (open flag)
+ev_ref ||--o{ event_change_requests
+users_ref ||--o{ event_change_requests : requested_by / decided_by
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| Week 7 change #6, operational safety check |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  event_change_requests comes from SG2-64/65 (backlog, no W7 tint).
+  safety_rereviews.resolved_by -> users: line omitted.
+  Outstanding rechecks are keys in events.outstanding_arrangements (page 1): venue_recheck,
+  equipment_recheck, registration_recheck (SG2-66) and safety_venue_recheck,
+  safety_equipment_recheck, safety_other_recheck (SG2-93, SG2-92 rework).
+  events.awaiting_safety_check_since and safety_check_revision (page 1) let a decision refuse
+  a stale review (202610190006); safety_approval_gate allows Preparation only after Approve (202610220001).
 endlegend
 @enduml

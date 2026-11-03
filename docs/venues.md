@@ -35,8 +35,8 @@ Invalid input returns 400, missing credentials 401, denied access 403, a missing
 update target 404, and service failures 503. Responses are not cached. Failed
 saves retain form values; session changes cancel requests and clear stale data.
 If a save loses its connection, reload to check whether it reached the server
-before creating the same venue again. Existing booking navigation is a prototype
-and is outside this story.
+before creating the same venue again. Venue booking requests and bookings are
+covered under their own stories below.
 
 ## Deployment and tests
 
@@ -266,7 +266,7 @@ SG2-80 flags every confirmed booking that falls in a period a venue is marked un
 - **Details kept (AC3).** Nothing changes the event's name, date, time, attendance or requirements, or the booking itself.
 - **Replacement (AC4).** **Find a replacement venue** on the affected booking reruns the venue search for that booking's period with the event's own requirements. A request made from it carries `replaces_booking_id`. The API accepts that only for an affected, confirmed booking of the same event, and then also accepts it once the event is in Preparation or Confirmed.
 - **Released on approval (AC5).** Approving the replacement releases the booking it replaces in the same transaction (`release_replaced_booking()`, which no role can call directly and which does not depend on who may release a booking by hand): the old request is cancelled, the event's venue moves to a booking still confirmed, the event's history records the release and the coordinator and organiser are told. The flag clears with the booking.
-- **Back to Planning (AC6).** An event that is Confirmed or in Preparation when one of its bookings is flagged moves back to Planning (SG2-66). The move and the cleared confirmation stamp are recorded, and the organiser is told the venue arrangement is being changed. `STATUS_TRANSITIONS` now allows `preparation -> planning` and `confirmed -> planning`. An event already in Planning, or not yet approved, keeps its status.
+- **Back to Planning (AC6).** An event that is Confirmed or in Preparation when one of its bookings is flagged moves back to Planning (SG2-66). The move and the cleared confirmation stamp are recorded, and the organiser is told the venue arrangement is being changed. An event already in Planning, or not yet approved, keeps its status.
 
 Migration `202610170001_venue_replacement.sql` adds the notice kind, `venue_booking_requests.replaces_booking_id`, the flag trigger, `release_replaced_booking()`, and new versions of `confirm_event()` and `decide_venue_booking_request()`. It must be applied after `202610150001_event_confirmation.sql` and `202610160001_event_notifications.sql`. SG2-80's SQL test now expects an affected confirmed event to be in Planning.
 

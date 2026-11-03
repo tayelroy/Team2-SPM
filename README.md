@@ -9,15 +9,15 @@ every action is checked by role on the server, not just hidden in the UI.
 An npm-workspaces monorepo:
 
 - **`client/`** — React + Vite single-page app.
-  - `src/screens/` — one file per page (Login, Dashboard, RequestForm, DraftRequests, EventsTable, EventDetail, Venues, AvailabilityCalendar, Profile, plus a few still-prototype screens — see below).
+  - `src/screens/` — one file per page (Login, Dashboard, RequestForm, DraftRequests, EventsTable, EventDetail, WorkQueue, Venues, VenueHolds, AvailabilityCalendar, EquipmentDesk, AssignmentQueue, CoordinatorOverview, SafetyChecks, EventSearch, FindEvents, MyRegistrations, Profile and others).
   - `src/api/` — typed fetch wrappers for the backend, one module per feature area.
   - `src/auth/` — session storage and the client-side permission check used to decide what to show.
-  - `src/mock/` — fixture data and types backing the screens that aren't wired to a real API yet.
+  - `src/mock/` — navigation per role, page headings, shared types and the view-model helpers (status labels, `eventActionLabel`, `navFor`). The screens read their data from `src/api/`, not from fixtures.
 - **`server/`** — Express + TypeScript API.
   - `src/auth/` — login, logout, session verification, and the role → permission map (`policy.ts`).
   - `src/events/` — event request handlers (create, list, detail, update, delete, submit).
   - `src/venues/` — venue catalogue and availability handlers.
-  - `src/equipment/` — equipment records, operational status and eligible stock.
+  - `src/equipment/` — equipment records, operational status and eligible stock, plus requirements, availability and reservations.
   - `src/profile/` — the caller's own profile.
   - `src/db/` — the actual Supabase queries behind all of the above.
 - **`supabase/`** — `migrations/` (schema history — not every table is captured yet), `seed_dev.sql`, `tests/`.
@@ -28,14 +28,14 @@ An npm-workspaces monorepo:
 | Role | What's actually wired up today |
 | --- | --- |
 | Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
-| Event Coordinator | View awaiting-review requests and active assigned events; record and amend equipment requirements for approved/planning events |
-| Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
+| Event Coordinator | Review, approve or reject and clarify requests; record planning details; request venues and equipment; record and amend equipment requirements; confirm and complete events; accept or refuse organisers' change requests and see their impact; cancel events; see an event's registrations; rework a rejected safety check |
+| Venue Staff | Decide pending booking requests, place and release venue holds, approve capacity exceptions; maintain the venue catalogue (including deleting a venue), availability and holds' expiry; confirm changes sent back by the Safety Officer |
 | Technical Support Staff | View pending and reserved equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; reserve equipment for events; change a user's role via the API |
-| Attendee | UI prototype only (mock data), not wired to a real backend |
-| Event Coordinator Lead | See the unassigned queue of submitted requests; assign and reassign Event Coordinators; view an event's stage and history; receive submitted-event notices |
-| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only; review events awaiting the operational safety check and record Approve, Reject or Request Changes (SG2-91, SG2-92). An event reaches Preparation, and can be confirmed, only on the Safety Officer's approval (SG2-94) |
+| Attendee | Find events open for registration, register with contact details and needs, join the waiting list for a full event, see and withdraw their own registrations (SG2-59, 60, 61, 62), and receive notices when an event they registered for changes or is cancelled (SG2-102, SG2-67) |
+| Event Coordinator Lead | See the unassigned queue of submitted requests; assign and reassign Event Coordinators; view an event's stage and history; see the events they supervise and which coordinator holds each (SG2-89); receive submitted-event notices |
+| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only; review events awaiting the operational safety check and record Approve, Reject or Request Changes (SG2-91, SG2-92, SG2-93). An event reaches Preparation, and can be confirmed, only on the Safety Officer's approval (SG2-94) |
 
-Every account can view and update its own profile. Technical Support Staff's
+Every internal role can find an event across the system (SG2-70), and every account has a notification inbox (SG2-69). Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational
 status and the quantity eligible for use. Apply the [equipment migration](docs/equipment.md)
 before deploying it.
@@ -45,8 +45,8 @@ for request, booking or selected dates, then [reserve equipment](docs/equipment-
 with an atomic stock check, an event receipt and a coordinator notification.
 Apply each workflow's migration before deploying it. Requirements and advisory
 checks do not reserve stock; SG2-55 commits the full requested quantity.
-The SG2-41 dashboard queue and its selected-record detail view use Supabase;
-approval/rejection mutations are separate work. See [work queue setup](docs/work-queue.md)
+The SG2-41 dashboard queue and its selected-record detail view use Supabase.
+See [work queue setup](docs/work-queue.md)
 for the required migration and queue rules.
 
 Access is enforced server-side by role on every request — see
@@ -206,7 +206,8 @@ uploaded as the `browser-regression` artifact.
 - [Change requests](docs/change-requests.md) — SG2-64 the organiser asks for a change after submitting, API, migration, no direct edits while returned for clarification, and verification; SG2-65 the coordinator accepts or refuses it, who decided and when, and accepting on a request returned for clarification
 - [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and where change requests come from
 - [Safety checks](docs/safety-checks.md) — SG2-92 the Safety Officer's Approve / Reject / Request Changes decision on SG2-91's list, refused when the event changed since it was reviewed, its notices and history, and reworking a rejection; SG2-93 sending the named arrangements back to Venue Staff and Technical Support and returning the event to the check once they are confirmed again; SG2-94 the approval as the only way into Preparation and a condition of confirmation, withdrawn by a significant accepted change
-- [Registrations](docs/registrations.md) — SG2-63 who has registered and how many places remain, contact details for the creating organiser and the coordinator, and the organiser's capacity, opening and closing times, closing early and reopening, with history and notices
+- [Registrations](docs/registrations.md) — SG2-63 who has registered and how many places remain, contact details for the creating organiser and the coordinator, and the organiser's capacity, opening and closing times, closing early and reopening, with history and notices; SG2-59 and SG2-60 attendees finding events and registering; SG2-62 withdrawing; SG2-61 the waiting list for a full event
+- [Notifications](docs/notifications.md) and [notification inbox](docs/notification-inbox.md) — SG2-68 and SG2-69 every kind of notice and the inbox; SG2-102 telling registered attendees when their event changes
 
 CI runs the complete regression suite before and after each PR merge.
 

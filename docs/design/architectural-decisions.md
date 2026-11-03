@@ -1,6 +1,6 @@
-# ConnectSphere architectural decisions and Week 7 change log — as of PR90 head 61416cc (16 Oct 2026)
+# ConnectSphere architectural decisions and Week 7 change log — as of main `4881413` (3 Nov 2026)
 
-Revision note: the original 14 Oct design described main `1d1e336`. This revision describes PR90 head `61416cc`, including merged PR92; it does not claim that PR90 is merged or that every Done criterion has passed hosted acceptance. Jira status was refreshed on 16 Oct 2026.
+Revision note: the original 14 Oct design described main `1d1e336`, and the 16 Oct revision described PR90 head `61416cc`. This revision describes main `4881413` (3 Nov 2026), after the 23 Sprint 4 stories (SG2-56, SG2-59 to SG2-67, SG2-69, SG2-70, SG2-83, SG2-89, SG2-91 to SG2-94, SG2-96, SG2-102, SG2-104 to SG2-106) were merged. It does not claim hosted acceptance of every criterion. Story status comes from the Sprint 4 Jira state supplied for this revision; the implementation claims below were checked against the code, migrations and tests on `main`.
 
 SG2-95. This document has three parts:
 
@@ -17,7 +17,7 @@ The companion artefacts in `docs/design/` are:
 | `connectsphere.dsl` | C4 L1–L3 |
 | `class-diagram.puml` | domain classes |
 | `data-model.puml` | ER model |
-| `sequence-diagrams.puml` | five Week 7 flows |
+| `sequence-diagrams.puml` | eight flows (the five Week 7 flows, plus registration, change request and cancellation) |
 | `event-status-model.puml` | event status state machine |
 | [`api-specification.md`](api-specification.md) | every endpoint |
 
@@ -41,12 +41,12 @@ Each ADR is **Accepted**, meaning it is in force at this snapshot.
 
 - The server build copies `client/dist` into `server/public`, which Vercel serves as static files.
 - `/api/*` and `/health*` are routed to one serverless function, `api/index.js`, which wraps the Express app.
-- `app.set('trust proxy', 1)` is there because of Vercel's single proxy hop (`app.ts:110-115`).
+- `app.set('trust proxy', 1)` is there because of Vercel's single proxy hop (`app.ts:145`).
 - In local development, Vite proxies `/api/*` to Express on port 5000 (`README.md`).
 
 **Consequences.**
 
-- One API surface: 73 endpoints, all listed in `api-specification.md`.
+- One API surface: 108 endpoints, all listed in `api-specification.md`.
 - Login goes through the API (`POST /api/auth/login`), and the browser never talks to Postgres directly.
 - The serverless runtime has no long-running process, so time-based work runs in the database (ADR-08) **[inference about the motive]**.
 - Each router builds its own Supabase client per request (`auth/supabase.ts`, `db/user-client.ts`). These clients use a 5 s timeout and `redirect: 'error'`.
@@ -55,11 +55,11 @@ Each ADR is **Accepted**, meaning it is in force at this snapshot.
 
 ### ADR-02 Server-side RBAC through a permission map, with RLS as defence in depth
 
-**Context.** There are seven roles: the original five, plus Event Coordinator Lead and Safety Officer, which Week 7 added (SG2-86). Many rules depend on the particular record ("only the assigned coordinator", "only the creating organiser"). Roles must take effect without waiting for a new token to be issued.
+**Context.** There are seven roles: the original five, plus Event Coordinator Lead and Safety Officer, which Week 7 added (SG2-86). An account may hold several of them (SG2-104, ADR-09). Many rules depend on the particular record ("only the assigned coordinator", "only the creating organiser"). Roles must take effect without waiting for a new token to be issued.
 
 **Decision.**
 
-1. **Authenticate each request.** `requireAuth` (`server/src/auth/index.ts`) verifies the Bearer token with Supabase Auth, then reads the role from `public.account_roles`. Token claims and request bodies never decide the role. `protectedRouter()` applies this to every router.
+1. **Authenticate each request.** `requireAuth` (`server/src/auth/index.ts`) verifies the Bearer token with Supabase Auth, then reads every role the account holds from `public.account_roles` and picks the request's acting role (ADR-09). Token claims and request bodies never decide the roles. `protectedRouter()` applies this to every router; sibling routers on one request reuse the identity already verified for the same headers instead of calling Supabase Auth again.
 2. **Check the permission.** `requirePermission(action)` checks one central map, `PERMISSIONS` in `server/src/auth/policy.ts`, where actions without a grant are denied. The client hides actions using `GET /api/auth/me`'s `permissions` list, but the server is the authority.
 3. **Check the record.** Each handler enforces the per-row rule after the role check. Where possible it puts that rule inside the write itself, as a guarded `UPDATE … WHERE coordinator_id = caller AND status = …` (`server/src/db/eventRequests.ts`).
 4. **Keep RLS on as a second line.** Row level security stays enabled on the tables. Examples:
@@ -71,8 +71,8 @@ Each ADR is **Accepted**, meaning it is in force at this snapshot.
 
 | Mode | Client | RLS applies? | Used by |
 |---|---|---|---|
-| User-scoped | `createUserScopedClient(token)` (`db/user-client.ts`) | **Yes**. The caller's JWT is sent to PostgREST | Venues, layouts, operations, blocks, availability, search, equipment (all), notifications, holds, and the RPC writes `confirm_event`, `decide_venue_booking_request`, `withdraw_venue_booking_request`, `release_venue_booking` |
-| Service role | `getSupabaseAdminClient()` (`db/supabase.ts`) | **No**, RLS is bypassed | Event-request handlers (`server/src/events/*` except `confirm`), profile, work queue, assignment queue, role update, logout, suitability, booking-request create/list/conflicts, bookings list, clashes |
+| User-scoped | `createUserScopedClient(token)` (`db/user-client.ts`) | **Yes**. The caller's JWT (and `X-Acting-Role`) is sent to PostgREST | Venues (including delete), layouts, operations, blocks, availability, search, equipment (all), notifications and the inbox, holds (including expiry), event search, registrable events, my registrations, safety checks, and the RPC writes `confirm_event`, `decide_venue_booking_request`, `withdraw_venue_booking_request`, `release_venue_bookings`, `request_event_cancellation`, `cancel_event`, `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` |
+| Service role | `getSupabaseAdminClient()` (`db/supabase.ts`) | **No**, RLS is bypassed | Event-request handlers (`server/src/events/*` except `confirm` and `cancellation`), including change requests, safety decisions and the registration picture and settings; safety re-reviews, coordinator overview, profile, work queue, assignment queue, role update, logout, suitability, booking-request create/list/conflicts, bookings list, clashes |
 
 **Consequences.**
 
@@ -97,10 +97,14 @@ The RPCs are:
 | Area | Functions |
 |---|---|
 | Venue decisions | `decide_venue_booking_request` |
-| Holds | `create_venue_hold`, `change_venue_hold`, `process_venue_hold_deadlines` |
-| Bookings and requests | `release_venue_booking`, `withdraw_venue_booking_request` |
-| Events | `confirm_event` |
+| Holds | `create_venue_hold`, `change_venue_hold`, `change_venue_hold_expiry`, `process_venue_hold_deadlines` |
+| Bookings, requests, venues | `release_venue_bookings` (replaced `release_venue_booking`, SG2-83), `withdraw_venue_booking_request`, `delete_venue` |
+| Events | `confirm_event`, `request_event_cancellation`, `cancel_event` |
+| Registration | `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` |
 | Equipment | `manage_equipment_requirements`, `manage_equipment_reservations` |
+| Notifications | `notification_inbox`, `read_notification`, `read_all_notifications`, `set_notification_reminder_preferences` |
+
+A second group is granted to `service_role` only and called by the API after its own checks, with the verified actor passed in: `raise_event_change_request`, `decide_event_change_request`, `apply_accepted_event_change`, `settle_arrangement_recheck`, `record_safety_decision`, `rework_safety_rejected_event`, `confirm_safety_rereview`, `update_event_request_draft`. Each is a single database function call; the API does not stitch their steps together.
 
 The setup and turnaround gap is a shared internal function, `venue_preparation_gap()`. The hold sweep uses `for update skip locked` on venues so that a batch cannot deadlock (`202610050001_venue_holds.sql`).
 
@@ -115,7 +119,7 @@ Constraints act as a backstop below the RPCs:
 - The TypeScript and SQL versions of a rule must agree. For example, readiness is checked in `arrangementReadiness.ts` and again in `confirm_event` (`docs/event-arrangements.md`).
 - RPCs are redefined by later migrations, so the latest definition is in the newest migration that contains it.
 
-**Where:** `supabase/migrations/2026100*`–`2026101*`, `server/src/db/venueBookingDecisions.ts`, `venueHolds.ts`, `eventConfirmation.ts`, `equipmentReservations.ts`.
+**Where:** `supabase/migrations/2026100*`–`2026103*`, `server/src/db/venueBookingDecisions.ts`, `venueHolds.ts`, `eventConfirmation.ts`, `equipmentReservations.ts`, `eventCancellation.ts`, `registrableEvents.ts`, `safetyDecisions.ts`.
 
 ### ADR-04 Handler-side writes are guarded (optimistic) updates, not read-then-write
 
@@ -147,7 +151,7 @@ Constraints act as a backstop below the RPCs:
 **Consequences.**
 
 - Singapore has no daylight saving, so a fixed `+08:00` is safe.
-- The server does not depend on its own time zone, except for the endpoints that accept zone-less strings (Part C, item 6).
+- The server does not depend on its own time zone, except for the endpoints that accept zone-less strings (Part C, item 5).
 
 **Where:** `client/src/venues/searchApi.ts`, `client/src/screens/*`, `server/src/venues/holdFields.ts`, `server/src/equipment/{availability,reservations}.ts`.
 
@@ -172,26 +176,26 @@ Constraints act as a backstop below the RPCs:
 
 ### ADR-07 Notices are rows in a notifications table, which the client polls
 
-**Context.** People must learn about decisions that affect them: a venue approved or rejected, a booking released, equipment reserved, a clash, an event confirmed or submitted, a coordinator assigned. Week 7 adds hold warnings and expiry notices (SG2-84/85) and the Lead's "waiting for a coordinator" notice (SG2-68).
+**Context.** People must learn about decisions that affect them: a venue approved or rejected, a booking released, equipment reserved, a clash, an event confirmed or submitted, a coordinator assigned. Week 7 adds hold warnings and expiry notices (SG2-84/85) and the Lead's "waiting for a coordinator" notice (SG2-68). Sprint 4 adds change-request, safety, cancellation, registration, waiting-list and attendee event-change notices, and a recipient-scoped inbox (SG2-69).
 
 **Decision.**
 
-- **One inbox table.** `public.notifications` holds one row per recipient, with a `kind` check list. RLS lets a user `select` only their own rows; only `service_role` and SECURITY DEFINER functions can insert.
-- **Writers.** Rows come from RPCs (venue decision, release, reservation, clash refresh, confirm) or from handlers through `notifyEvent()` (`server/src/db/eventNotifications.ts`, SG2-68). The actor is never notified of their own action.
-- **Reading.** `GET /api/notifications` returns the newest 50. The client polls; there is no push.
-- **Hold notices** (`placed`, `warning`, `expired`) live in a separate table, `venue_hold_notifications`, read through `GET /api/venue-holds/notifications`. The client refreshes them every 30 s and on focus (`docs/venue-holds.md`).
+- **One notices table.** `public.notifications` holds one row per recipient, with a `kind` check list that each Sprint 4 migration extends. RLS lets a user `select` only their own rows; only `service_role` and SECURITY DEFINER functions can insert.
+- **Writers.** Rows come from RPCs (venue decision, release, reservation, clash refresh, confirm, cancellation, registration, change-request decisions) or from handlers through `notifyEvent()` (`server/src/db/eventNotifications.ts`, SG2-68). The actor is never notified of their own action.
+- **Reading.** `GET /api/notifications` returns the newest 50 of the `notifications` table for the roles holding `notifications.read`. Since SG2-69 every role reads through `GET /api/notifications/inbox` (`notifications.inbox`), which merges `notifications` and `venue_hold_notifications` newest first with a keyset cursor, an unread count and `read_at` (migration `202610200003_notifications_inbox_reminders.sql`); the client polls, there is no push.
+- **Hold notices** (`placed`, `warning`, `expired`, `expiry_changed`) live in the separate table `venue_hold_notifications`, read through `GET /api/venue-holds/notifications` and through the inbox. The client refreshes them every 30 s and on focus (`docs/venue-holds.md`).
 
 **Consequences.**
 
 - Notices are simple to secure, because RLS limits each user to their own rows.
-- There are two inboxes. The Safety Officer has no notification grant yet.
-- There is no read/unread state in the schema.
+- There are still two tables; only the inbox presents them as one list.
+- Read/unread state exists (`read_at` on both tables), but only on the inbox endpoints; `GET /api/notifications` does not return it.
 
-**Where:** `202610060001_venue_booking_decisions.sql` (table and policy), `202610160001_event_notifications.sql`, `202610050001_venue_holds.sql`, `server/src/notifications/index.ts`, `docs/notifications.md`.
+**Where:** `202610060001_venue_booking_decisions.sql` (table and policy), `202610160001_event_notifications.sql`, `202610050001_venue_holds.sql`, `202610200003_notifications_inbox_reminders.sql`, `server/src/notifications/index.ts`, `docs/notifications.md`, `docs/notification-inbox.md`.
 
 ### ADR-08 Time-based work runs in the database on pg_cron
 
-**Context.** Tentative holds must expire on time, with a warning beforehand (Week 7 change #4), even when nobody has the app open.
+**Context.** Tentative holds must expire on time, with a warning beforehand (Week 7 change #4), even when nobody has the app open. Sprint 4 added three more time-driven jobs: registration windows, waiting-list offers and arrangement reminders.
 
 **Decision.**
 
@@ -201,13 +205,63 @@ Constraints act as a backstop below the RPCs:
 - **Lazy processing.** The list RPCs run the same processing before they read.
 - **Enforcement.** Every occupancy check filters on `expires_at > now`, so the clock is enforced at read and decision time regardless of the job.
 - **No pg_cron.** If the extension is missing, the migration emits a notice telling operators to provision a scheduler.
+- **Sprint 4 jobs.** `registration-windows` (every minute, `process_registration_windows()`, which opens and closes registration and sends `registration_opened` / `registration_closed`, `202610200004_event_registration_settings.sql`), `waiting-list-offers` (every minute, `process_waiting_list_offers()`, which lapses unanswered offers and offers the place to the next attendee, `202610280001_waiting_list.sql`) and `sg2-69-arrangement-reminders` (hourly, `send_outstanding_arrangement_reminders()`, at each coordinator's chosen cadence, `202610200003_notifications_inbox_reminders.sql`).
 
 **Consequences.**
 
 - No server timer is needed (ADR-01).
 - Notices can arrive up to one minute late, but enforcement is never late.
 
-**Where:** `supabase/migrations/202610050001_venue_holds.sql:126-150,302-312`, `docs/venue-holds.md`.
+**Where:** `supabase/migrations/202610050001_venue_holds.sql:126-150,302-312`, `202610200003`, `202610200004`, `202610280001`, `docs/venue-holds.md`.
+
+### ADR-09 One request, one acting role (multi-role accounts, SG2-104)
+
+**Context.** The customer clarified that one account can hold several of the seven roles, replacing "exactly one role" (SG2-24 AC1). Row level security and the permission map each ask "does the caller hold role X", so letting a multi-role account use every role at once would merge their powers (`202610180001_account_multi_roles.sql`).
+
+**Decision.**
+
+- **One acting role per request.** The client names it in the `X-Acting-Role` header; `requireAuth` checks that the account holds it and runs the rest of the request, including its database calls, as that role (`server/src/auth/actingRole.ts`, `AsyncLocalStorage`). A malformed or repeated header is 400, a role not held is 403.
+- **Defaults.** With no header a single-role account acts as its role; a multi-role account acts as the least-privileged role it holds (`ACTING_ROLE_DEFAULT_ORDER`: attendee first, Technical Support last).
+- **The database re-checks.** The header is forwarded to PostgREST; `public.acting_role()` returns it only if the caller's own `account_roles` rows contain it, and `lock_acting_role()` is used by the write RPCs. The acting role only ever narrows what the account holds (`202610200002_acting_role_functions.sql`).
+- **Separation of duties.** Nobody changes their own roles: refused in `auth/roles.ts` and again in the database's `change_account_roles()` (`202610180001_account_multi_roles.sql`); `PATCH /api/users/:userId/role` replaces the whole role set and refuses to remove an account's last role. The Lead never makes an event's own organiser its coordinator, and Venue Staff never decide a venue request they raised themselves (`202610180003_separation_of_duties.sql`, `202610200002_acting_role_functions.sql`).
+
+**Consequences.**
+
+- Every `PERMISSIONS` check and RLS policy sees one role, so no endpoint needed a multi-role special case.
+- `GET /api/auth/me` and login return both `role` (acting) and `roles` (held).
+- Extra roles are granted in SQL, not through the API.
+
+**Where:** `server/src/auth/{index,actingRole,roles,login}.ts`, `supabase/migrations/202610180001_account_multi_roles.sql`, `202610180003_separation_of_duties.sql`, `202610200002_acting_role_functions.sql`.
+
+### ADR-10 Waiting-list places are offered with an expiring hold, decided under the event lock (SG2-61, SG2-62)
+
+**Context.** When an event is full, attendees join a waiting list; when a place frees up it must go to the first person in line without two people taking the same place.
+
+**Decision.**
+
+- **Lock first.** `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` and the capacity change all lock the event row before reading counts, so the last place is decided one attempt at a time.
+- **Offers, not auto-registration.** A freed place (a withdrawal, or a capacity increase) is offered to the first waiting attendee (`waiting_list_offer` notice) and held for them for `events.waiting_list_response_hours` (1 to 168, default 24, team decision 28 Oct 2026), or until registration closes if sooner. A place counts as held by an active registration or an unexpired offer (`private.places_held`).
+- **Lapse.** An unanswered offer lapses (`waiting_list_offer_lapsed`) and the place passes to the next attendee. The `waiting-list-offers` pg_cron job catches lapsed offers every minute (ADR-08) and every write catches them first.
+- **Rules in the schema.** One active entry per attendee per event (partial unique index `waiting_list_one_active_per_attendee`); statuses `waiting`, `offered`, `registered`, `left`, `lapsed`.
+
+**Consequences.** Offers are time-limited rather than instant, so a place can sit unfilled until its offer lapses. The response window is the organiser's setting (`PATCH …/registration-settings`).
+
+**Where:** `supabase/migrations/202610280001_waiting_list.sql`, `server/src/registrableEvents/index.ts`, `server/src/db/registrableEvents.ts`, `server/src/events/registrationSettings.ts`.
+
+### ADR-11 The safety approval is a database gate, and decisions are bound to a revision (SG2-92, SG2-94)
+
+**Context.** Week 7 change #6 requires a Safety Officer's approval before an event can be prepared and confirmed. A check made only in the API could be bypassed by any other writer.
+
+**Decision.**
+
+- **Trigger gate.** `safety_approval_gate` refuses any move into `preparation` unless the event is leaving `awaiting_safety_check` on an Approve decision made during that wait; `record_safety_decision()` is the only writer that passes (`202610220001_safety_approval_gate.sql`). `confirm_event()` additionally lists `safety` as outstanding unless a current approval exists.
+- **Stale-review guard.** `events.safety_check_revision` changes whenever an event moves into or out of the check; a decision carries the revision the Safety Officer reviewed and is refused (409 `code: "stale"`) if the event has since changed (`202610190006_safety_decision_revision.sql`).
+- **History is append-only.** Decisions go to `event_safety_decisions`; an approval stops counting when the event leaves Preparation/Confirmed, without editing the history.
+- **Request Changes** sends named venue bookings or equipment requests back to Venue Staff or Technical Support (`safety_rereviews`), and the event waits in Planning with `safety_*_recheck` keys until each is confirmed again and the coordinator settles the rest (`202610240001_safety_changes_requested.sql`). Rework of a Safety Rejected event leaves an explicit resubmit step (`202610290002_safety_rework_resubmit.sql`).
+
+**Consequences.** The rule holds whichever client calls; the cost is that the TypeScript readiness mirror (`arrangementReadiness.ts`) and the SQL must change together (ADR-03).
+
+**Where:** `supabase/migrations/202610190004_safety_check_queue.sql` to `202610290002_safety_rework_resubmit.sql`, `server/src/events/{safetyDecisions,safetyDecisionRoutes,safetyRereviewRoutes}.ts`, `server/src/safetyChecks/index.ts`, `docs/safety-checks.md`.
 
 ---
 
@@ -221,17 +275,17 @@ The log follows the IS212 Managing Changes guide:
 
 The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
-**Story status** originally came from the SG2-95 brief and is refreshed against the 16 Oct 2026 Jira export for SG2-81/88/98. Implementation claims below describe PR90 head 61416cc, including PR92; status alone is not acceptance evidence. Diagrams mark Week 7 additions `<<Week 7>>` (`#FFF4CC`) and work not yet built `<<planned>>` (dashed, `#DDDDDD`).
+**Story status** originally came from the SG2-95 brief and is refreshed against the Sprint 4 Jira state: all stories listed in this Part are Done and merged on `main` at `4881413`. Implementation claims below were checked against the code at that head; status alone is not acceptance evidence. Diagrams mark Week 7 additions `<<Week 7>>` (`#FFF4CC`); the `<<planned>>` style was for work not yet built, and no Week 7 change is unbuilt any more.
 
 ### Summary
-| # | Change | Type | Built at this snapshot | «planned» (To Do) |
+| # | Change | Type | Built at this snapshot | Not built |
 |---|---|---|---|---|
 | 1 | Venue setup & turnaround time in availability and conflicts | New requirement that changes the existing conflict rule | SG2-77, SG2-78, SG2-79 | — |
 | 2 | Venue temporarily unavailable; replace it | Change to an existing requirement (supersedes SG2-45 AC2) + new requirement (replace) | SG2-80, SG2-81 (replace), SG2-98 (remediation) | — |
-| 3 | More than one venue per event | Clarification of an existing requirement (SG2-48 AC4 already allowed several requests) | SG2-82 | SG2-83 (change/cancel one venue) |
-| 4 | Tentative venue holds with expiry | New requirement (the legacy `held` booking status had no expiry or lifecycle) | SG2-84, SG2-85 | — |
-| 5 | Event Coordinator Lead assigns coordinators | Change to an existing requirement: the assigning role moves from TSS to a new role | SG2-86, SG2-87, SG2-88, SG2-90, SG2-97 | SG2-89 |
-| 6 | Operational safety check by a Safety Officer | New requirement | SG2-86 (role), SG2-77 (venue safety details), SG2-100 (statuses) | SG2-91, SG2-92, SG2-93, SG2-94 (epic SG2-76) |
+| 3 | More than one venue per event | Clarification of an existing requirement (SG2-48 AC4 already allowed several requests) | SG2-82, SG2-83 (change/cancel one venue) | — |
+| 4 | Tentative venue holds with expiry | New requirement (the legacy `held` booking status had no expiry or lifecycle) | SG2-84, SG2-85, SG2-106 (hold expiry change) | — |
+| 5 | Event Coordinator Lead assigns coordinators | Change to an existing requirement: the assigning role moves from TSS to a new role | SG2-86, SG2-87, SG2-88, SG2-89, SG2-90, SG2-97 | — |
+| 6 | Operational safety check by a Safety Officer | New requirement | SG2-86 (role), SG2-77 (venue safety details), SG2-100 (statuses), SG2-91, SG2-92, SG2-93, SG2-94 (epic SG2-76) | — |
 
 ### Change #1 — Setup and turnaround time count towards availability and conflicts
 
@@ -277,13 +331,13 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
 **Stories:**
 - **Built / Jira Done:** SG2-80, SG2-81 replacement and SG2-98 overlapping-unavailability remediation. SG2-98 AC1/AC4 are historical delivered context; AC2/AC3 cover retained blocks, removal and restored search.
-- **Separate planned work:** SG2-83 general change/cancellation of one venue, not the affected-booking replacement contract.
+- **Related:** SG2-83 (general change/cancellation of one venue, change #3) reuses the same replacement route; it is not the affected-booking replacement contract.
 
 **§5 Artefacts changed:**
 
 | Artefact | What changed |
 |---|---|
-| C4 | Venue Staff marks unavailability; the built replacement responsibility extends existing booking routes and DB adapters. General SG2-83 stays planned. |
+| C4 | Venue Staff marks unavailability; the built replacement responsibility extends existing booking routes and DB adapters. General change/cancel of one venue (SG2-83) is built on the same routes (change #3). |
 | Class | VenueUnavailability links affected bookings; VenueBookingRequest optionally references the booking it replaces. No separate replacement entity is invented. |
 | Data model | `venue_unavailability` gains `category`, `created_by` and `created_at`. New table `venue_booking_disruptions` and view `venue_affected_bookings` (`202610100001`); replacement FK/partial index, notification kind and notify/reversion trigger (`202610170001`). |
 | Sequence | Diagram 2 shows new disruption notices/status reversion, replacement request and atomic approval/release, with combined confirmation gates. |
@@ -294,15 +348,16 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 **§1 The change.**
 - An event's venue arrangement is ready only when **every** venue it needs is approved and booked.
 - A coordinator can withdraw a pending or rejected request the event no longer needs.
-- Releasing one booking leaves the others in place.
+- Releasing one booking leaves the others in place; the coordinator can name further bookings of the event to cancel in the same call (SG2-83).
+- A coordinator can change one venue through a replacement request with a reason, on any current confirmed booking; Venue Staff are told of cancellations and change requests, and a Confirmed or Preparation event returns to Planning (SG2-83).
 
 **Why** (`202610150002_venue_request_withdrawal.sql`): events use several spaces, and one rejected venue must not leave the event looking ready.
 
 **§2 Type.** A clarification and tightening of an existing requirement. SG2-48 AC4 already allowed several requests; SG2-82 fixes what "ready" means and adds withdrawal. Changing or cancelling one venue is a new requirement.
 
-**Stories:**
-- **Built:** SG2-82.
-- **«planned»:** SG2-83, change or cancel one venue.
+**Stories, both built:**
+- **SG2-82:** readiness over every venue, and withdrawal.
+- **SG2-83:** change or cancel one venue (`POST /api/venue-bookings/:bookingId/release` with `also_cancel`, `replaces_booking_id` + `change_reason` on `POST /api/venue-booking-requests`, `202610210002_venue_booking_change_cancel.sql`). Only the event's assigned coordinator cancels a booking; Venue Staff no longer release bookings and mark the venue unavailable instead.
 
 **§5 Artefacts changed:**
 
@@ -310,7 +365,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 |---|---|
 | Class | Event 1–* VenueBookingRequest and Event 1–* VenueBooking. `events.venue_booking_id` stays as a "first or earliest confirmed venue" pointer. |
 | Data model | `venue_booking_requests` gains `withdrawn_by`, `withdrawn_at` and a check constraint (`202610150002`). The `confirm_event` venue gate is replaced (`202610150003`). |
-| API | New: `POST /api/venue-booking-requests/:requestId/withdraw`. Changed: `GET /api/venue-booking-requests` (`arrangement` tally), `GET …/arrangements` and `PATCH …/confirm` (a rejected or pending venue is outstanding), and the `decision` and `release` RPCs (pointer handling). |
+| API | New: `POST /api/venue-booking-requests/:requestId/withdraw`. Changed: `GET /api/venue-booking-requests` (`arrangement` tally), `GET …/arrangements` and `PATCH …/confirm` (a rejected or pending venue is outstanding), and the `decision` and `release` RPCs (pointer handling). SG2-83: `POST /api/venue-bookings/:bookingId/release` is coordinator-only and takes `also_cancel`; `POST /api/venue-booking-requests` takes `change_reason`; new notice kinds `venue_booking_cancelled` and `venue_change_requested`. |
 | C4 / Sequence | No new container or flow. Diagram 1 shows decisions per request. |
 
 ### Change #4 — Tentative venue holds with expiry
@@ -326,7 +381,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
 **§2 Type.** A new requirement. The legacy `venue_bookings.status = 'held'` value is kept only for old data.
 
-**Stories, both built:** SG2-84 (placement, convert, release) and SG2-85 (expiry, warning and expiry notices, history).
+**Stories, all built:** SG2-84 (placement, convert, release), SG2-85 (expiry, warning and expiry notices, history) and SG2-106 (change a hold's expiry; hold-expiry sweep and venue delete, `202610170007_venue_delete_hold_expiry.sql`).
 
 **§5 Artefacts changed:**
 
@@ -336,7 +391,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 | Class | New classes VenueHold (status `tentative`/`converted`/`released`/`expired`, `expires_at`, `warning_sent_at`) and VenueHoldNotification. |
 | Data model | New tables `venue_holds`, `venue_hold_notifications` and `venue_hold_settings`, plus the effective occupancy view (`202610050001`). |
 | Sequence | Diagram 3 shows the hold placed, then pg_cron sending the 24-hour warning and the expiry notice. |
-| API | New: the six `/api/venue-holds` endpoints. |
+| API | New: the seven `/api/venue-holds` endpoints (including `POST …/:holdId/expiry`, SG2-106). |
 
 ### Change #5 — The Event Coordinator Lead assigns coordinators
 
@@ -356,9 +411,8 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
   - SG2-90: only the current assignee may act.
   - SG2-97: the permission moves to the Lead, and the Lead sees history.
   - SG2-88: assignment/reassignment as Lead through the existing coordinator route (Done in the refreshed Jira snapshot).
+  - SG2-89: oversight, `GET /api/coordinator-overview` (the events whose coordinator the Lead last assigned, with each coordinator's workload; `events.coordinator_assigned_by`, `202610220004_coordinator_oversight.sql`).
   - Related: SG2-68 (the Lead is notified of submissions) and SG2-100 (`unassigned` status).
-- **«planned»:**
-  - SG2-89, oversight.
 
 **§5 Artefacts changed:**
 
@@ -369,35 +423,37 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 | Data model | `account_roles` check constraint and `roles` rows (`202610050004_week7_roles.sql`). Status `unassigned` (`202610090001`), backfill (`202610090002`), `events.submitted_at` (`202610090004`). |
 | Sequence | Diagram 4 shows the Lead picking from the unassigned queue, then assigning, then the SG2-68 notices. |
 | State (`event-status-model.puml`) | Adds `unassigned`; transitions `draft → unassigned → submitted`. |
-| API | New: `GET /api/assignment-queue`. Changed: `GET /api/event-requests/assignable` and `PATCH …/coordinator` (TSS → ECL; first assignment moves `unassigned → submitted`), `PATCH …/submit` (target `unassigned`), `PATCH …/planning` (409 once reassigned), `…/history` and `…/stage` (ECL added), `GET /api/notifications` (ECL added), `GET /api/work-queue` (no unassigned items for EC). |
+| API | New: `GET /api/assignment-queue`, `GET /api/coordinator-overview`. Changed: `GET /api/event-requests/assignable` and `PATCH …/coordinator` (TSS → ECL; first assignment moves `unassigned → submitted`), `PATCH …/submit` (target `unassigned`), `PATCH …/planning` (409 once reassigned), `…/history` and `…/stage` (ECL added), `GET /api/notifications` (ECL added), `GET /api/work-queue` (no unassigned items for EC). |
 
 ### Change #6 — Operational safety check by a Safety Officer
 
 **§1 The change.**
-- A Safety Officer checks an event's operational safety before it can go into Preparation and be confirmed.
+- A Safety Officer checks an event's operational safety before it can go into Preparation and be confirmed: Approve, Reject, or Request Changes naming the arrangements to redo.
 - Venues carry emergency-access details and known restrictions for that check.
 
 **Why:** the Jira change (epic SG2-76) gives the reason. The code records the intended gate in `202610090001_event_status_flow.sql`: "give the Safety Officer gate (SG2-91/92/93/94) somewhere to stand between Arrangements and Confirmed".
 
 **§2 Type.** A new requirement.
 
-**Stories:**
-- **Built:**
-  - SG2-86: the role, with read-only grants for stage, history, equipment requirements and reservations.
-  - SG2-77: venue safety details.
-  - SG2-100: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation`; the 7-step stepper; `PATCH …/complete`.
-- **«planned»:** SG2-91, SG2-92, SG2-93 and SG2-94, the safety-check flow itself.
+**Stories, all built:**
+- SG2-86: the role, with read-only grants for stage, history, equipment requirements and reservations.
+- SG2-77: venue safety details.
+- SG2-100: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation`; the 7-step stepper; `PATCH …/complete`.
+- SG2-91: the safety-check list `GET /api/safety-checks` and the automatic move into `awaiting_safety_check` (`202610190004_safety_check_queue.sql`).
+- SG2-92: `POST …/safety-decision`, `GET …/safety-decisions`, `POST …/rework` (`202610190005`, `202610190006`).
+- SG2-93: Request Changes and the re-review confirmations by Venue Staff and Technical Support, `GET /api/safety-rereviews`, `POST /api/safety-rereviews/:reviewId/confirm` (`202610240001`).
+- SG2-94: the preparation gate, ADR-11 (`202610220001`).
 
 **§5 Artefacts changed:**
 
 | Artefact | What changed |
 |---|---|
-| C4 | New person: Safety Officer, with what they can do today. The safety-check flow is «planned» (SG2-91/92). |
-| Class | AccountRole gains `safety_officer`. Event gains the new statuses. SafetyCheck is «planned». |
-| Data model | `event_status` enum values (`202610090001`). Completion columns (`202610090003`). `venue_operations` safety fields. |
-| Sequence | Diagram 5 shows the safety-check decision as «planned», against the existing statuses. |
-| State | Adds `planning → awaiting_safety_check → preparation \| safety_rejected → …` from `STATUS_TRANSITIONS`. Those transitions have no API trigger yet. |
-| API | New: `PATCH /api/event-requests/:eventId/complete`. Changed: `…/stage` and `…/history` (SO added), `GET /api/equipment-requests` and `GET /api/equipment-reservations` (SO read). There are no safety-check endpoints (api-specification §11). |
+| C4 | New person: Safety Officer. The API gains the safety-check, safety-decision and safety re-review routes (see `connectsphere.dsl`). |
+| Class | AccountRole gains `safety_officer`. Event gains the new statuses. SafetyDecision and the re-review flag map to the tables below. |
+| Data model | `event_status` enum values (`202610090001`). Completion columns (`202610090003`). `venue_operations` safety fields. New: `event_safety_decisions`, `safety_rereviews`, `events.safety_check_revision` (`202610190004` to `202610240001`). |
+| Sequence | Diagram 5 shows the safety-check decision flow. |
+| State | Adds `planning → awaiting_safety_check → preparation \| safety_rejected → planning …`. The move into Preparation is guarded in the database (ADR-11), not by a transition table. |
+| API | New: `PATCH /api/event-requests/:eventId/complete`, `GET /api/safety-checks`, `POST …/safety-decision`, `GET …/safety-decisions`, `POST …/rework`, `GET /api/safety-rereviews`, `POST /api/safety-rereviews/:reviewId/confirm`. Changed: `…/stage` and `…/history` (SO added), `GET /api/equipment-requests` and `GET /api/equipment-reservations` (SO read), `GET …/arrangements` and `PATCH …/confirm` (a `safety` item). |
 
 ### Also at this snapshot since Week 7 (not one of the six changes)
 
@@ -410,6 +466,17 @@ These stories changed the same artefacts, so each artefact shows them as current
 | SG2-55 | Equipment reservations |
 | SG2-57 | Arrangement readiness |
 | SG2-48–SG2-54 | Venue requests, decisions, conflicts, release, and equipment records, requirements and availability |
+| SG2-59, SG2-60, SG2-61, SG2-62 | The Attendee backend: find registrable events, register, join the waiting list when full (ADR-10), see and withdraw own registrations (`202610220003`, `202610230001`, `202610260003`, `202610280001`) |
+| SG2-63 | The organiser's and coordinator's registration picture and the organiser's registration settings (`202610200004`) |
+| SG2-64, SG2-65, SG2-66 | Change requests after submit: raise, accept or refuse with a reason, and the impact of each (`202610190003`, `202610260001`, `202610270001`) |
+| SG2-67, SG2-56 | Cancel an event on the organiser's request, releasing venues and equipment (`202610220002`, `202610210001`) |
+| SG2-102 | Registered attendees are told when an event's start or venues change (`202610270002`) |
+| SG2-69 | The notification inbox and reminder preference (ADR-07, ADR-08) |
+| SG2-70 | Cross-system event search, `GET /api/event-search` (`202610200005`) |
+| SG2-104 | Multi-role accounts, ADR-09 |
+| SG2-105 | Required fields on submission (`preferred_layout` added, `202610200001`) |
+| SG2-106 | Venue delete (`202610170007`, `202610190001`) and hold-expiry change |
+| SG2-96 | End-to-end and release checks (`docs/release-readiness.md`) |
 
 ---
 
@@ -418,7 +485,7 @@ These stories changed the same artefacts, so each artefact shows them as current
 - PR92 implemented SG2-81: `venues/bookingRequests.ts`, `db/venueBookings.ts`, `db/venueDisruptions.ts`, `202610170001_venue_replacement.sql`.
 - PR90 combines persisted planning rechecks with disruption checks in `202610170002_confirmation_rechecks_and_disruptions.sql`; additive `202610160005_event_confirmation_record_repair.sql` supplies confirmation columns without replacing that function.
 - Client/API/server notification contracts accept and render `venue_unavailable` at head 61416cc. New disruption flags notify once; flags predating the trigger are not announced retrospectively. Organiser warning is conditional on Preparation/Confirmed reverting to Planning.
-- The source model documents implemented contracts. Natural end-to-end entry into Preparation still depends on planned Safety stories; fixture verification is not a hosted full-lifecycle pass.
+- The source model documents implemented contracts. Since SG2-91 to SG2-94 (19 to 24 Oct 2026), an event reaches Preparation through the Safety Officer's Approve, so the end of the lifecycle is reachable through the API (see Part C, former item 4). The 16 Oct statement that this still depended on planned Safety stories is superseded.
 
 ## Part C — Known limits
 
@@ -426,33 +493,22 @@ These stories changed the same artefacts, so each artefact shows them as current
    - A 503 can follow a status change that was already saved (`events/submit.ts`, `decide.ts`, `clarifications.ts`, `updatePlanning.ts`).
    - `assignCoordinator.ts` rolls the assignment back if history fails. If the notice write fails, the assignment stands and the caller still gets a 503.
    - `complete.ts` ignores a failed history write.
-   - Flows written as RPCs (ADR-03) do not have this problem.
-2. **Submission is two guarded updates, with a gap between them.** `submitEventRequest` (`server/src/db/eventRequests.ts:420-440`) runs the `unheld` update and then the `held` one. A coordinator cleared in between leaves the request in its old status with a 503. This is a documented, accepted gap.
+   - Accepting a change request applies the change (`apply_accepted_event_change`) and then records the decision in a second call (`events/changeRequests.ts`); if recording fails the change stands and the caller gets a 503.
+   - Flows written as RPCs (ADR-03) that commit their own history and notices do not have this problem.
+2. **Submission is two guarded updates, with a gap between them.** `submitEventRequest` (`server/src/db/eventRequests.ts`, around line 369) runs the `unheld` update and then the `held` one. A coordinator cleared in between leaves the request in its old status with a 503. This is a documented, accepted gap.
 3. **Replacing a venue's layouts is delete-then-insert**, not a single transaction (`db/venueLayouts.ts`).
-4. **The end of the event lifecycle cannot be reached through the API yet.**
-   - No endpoint moves an event `planning → awaiting_safety_check → preparation`; that is SG2-91..94.
-   - `confirm` requires `preparation`, and `complete` requires `preparation` or `confirmed`, so neither can run for an event created through the app until the safety-check stories land.
-5. **`STATUS_TRANSITIONS` is not enforced.**
-   - The table in `server/src/events/fields.ts` is used only by tests; each handler keeps its own status list.
-   - Submit (`rejected`/`needs_clarification → submitted`) and planning (`… → planning` after a confirmed impact) already go beyond it.
-6. **Some endpoints accept times without a zone.**
+4. **No table enforces the status graph.**
+   - `STATUS_TRANSITIONS` and `canTransition` were removed from `server/src/events/fields.ts` by PR #120 (SG2-22, commit `ca54162`); nothing in `server/src` references them.
+   - Each handler or RPC keeps its own status list. Two transitions are also guarded by database triggers: `safety_approval_gate` (into Preparation) and `keep_cancelled_events_cancelled` (a cancelled event never changes status).
+   - Submit (`rejected`/`needs_clarification → submitted`) and planning (`… → planning` after a confirmed impact) go beyond what the diagrams draw as the main path.
+5. **Some endpoints accept times without a zone.**
    - `POST /api/venue-booking-requests` (`bookingRequestFields.ts`) and `POST /api/venues/:venueId/blocks` (`blockFields.ts`) use `Date.parse` and do not require an offset, so a string without a zone would be read in the server's local time zone.
    - The shipped client always sends UTC ISO strings, so this only affects other callers. **[inference]**
-7. **Hold notices are delivered on a one-minute cadence.**
-   - Warning and expiry notices depend on pg_cron, so they can arrive up to a minute late (`docs/venue-holds.md`). Expiry enforcement itself is never late.
+6. **Time-driven notices and offers run on a one-minute (or hourly) cadence.**
+   - Hold warnings and expiry, registration opening and closing, and waiting-list offer lapses depend on pg_cron, so they can arrive up to a minute late; arrangement reminders are hourly (ADR-08). Expiry enforcement itself is never late.
    - Where pg_cron is unavailable, operators must provide their own scheduler.
-8. **Notifications have gaps.**
-   - There are two inboxes: `notifications` and `venue_hold_notifications`.
-   - There is no read/unread state.
-   - The API returns the newest 50 only.
-   - The Safety Officer holds no `notifications.read` grant.
-9. **Authentication repeats across shared prefixes.** Every router is its own `protectedRouter`, so a request under `/api/venues` or `/api/equipment-requests` runs `requireAuth`, with a Supabase Auth call and a role read, once for each router it passes through before a route matches.
-10. **Week 7 «planned» work:**
-
-    | Change | Stories |
-    |---|---|
-    | #3 | SG2-83 (change/cancel one venue) |
-    | #5 | SG2-89 (oversight) |
-    | #6 | SG2-91, SG2-92, SG2-93, SG2-94 (safety check) |
-
-    The diagrams draw these with dashed borders and grey `<<planned>>` styling, naming the story.
+7. **Notifications have gaps.**
+   - Two tables back the notices: `notifications` and `venue_hold_notifications`. Only the inbox (`GET /api/notifications/inbox`) merges them and shows read state; `GET /api/notifications` returns the newest 50 of the first table only, without read state.
+   - The Safety Officer and the Attendee do not hold `notifications.read`; they, like every role, read through the inbox (`notifications.inbox`).
+   - The client polls; there is no push.
+8. **Epics SG2-13, SG2-14, SG2-16, SG2-17 and SG2-18 are not built.** All six Week 7 changes and all 23 Sprint 4 stories are built, so nothing from them is left unbuilt; these five epics were not delivered (see api-specification §11). Their Jira status was supplied for this revision and is not visible in the repo **[inference]**.

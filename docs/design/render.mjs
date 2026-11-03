@@ -38,7 +38,7 @@ const markdown = file => execFileSync('npx', ['-y', 'marked@14', '--gfm', '-i', 
 const diagrams = {
   'C4_Level1_System_Context.pdf': c4.C1_Context,
   'C4_Level2_Container_Diagram.pdf': c4.C2_Containers,
-  'C4_Level3_Component_Diagram.pdf': ['C3_API_Components', 'C3_API_Components_Events', 'C3_API_Components_Venues', 'C3_API_Components_Bookings']
+  'C4_Level3_Component_Diagram.pdf': ['C3_API_Components', 'C3_API_Components_Events', 'C3_API_Components_Changes', 'C3_API_Components_Registrations', 'C3_API_Components_Venues', 'C3_API_Components_Bookings']
     .flatMap(view => c4[view] ?? []),
   'Class_Diagram.pdf': plantuml(join(here, 'class-diagram.puml')),
   'Data_Model.pdf': plantuml(join(here, 'data-model.puml')),

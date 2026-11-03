@@ -11,7 +11,7 @@ to register during its registration period.
 Product-owner decisions (binding):
 
 1. Only an event in **Preparation** can be confirmed (SG2-100
-   `STATUS_TRANSITIONS`: `preparation → confirmed`). SG2-94 AC5: an attempt on
+   `confirm_event()` checks the status: `preparation → confirmed`). SG2-94 AC5: an attempt on
    an event still in Approved, Planning, Awaiting Safety Check or Safety
    Rejected is refused with `outstanding`, the safety check included; every
    other status is refused with `closed`, including a second confirmation of
