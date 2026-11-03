@@ -191,8 +191,9 @@ on `events` that runs when an event's status moves into `cancelled`:
 
 - **AC1**: every reservation the event still holds is released in the same
   transaction as the cancellation. Whatever cancels the event only has to set
-  the status. SG2-67's `cancel_event()` is not built yet, so
-  `supabase/tests/equipment_release.sql` stands in for it by cancelling as the
+  the status. SG2-67's `cancel_event()` is now built (see
+  [event cancellation](event-cancellation.md)) and sets that status;
+  `supabase/tests/equipment_release.sql` still uses a stand-in that cancels as the
   assigned coordinator.
 - **AC2**: no new stock rule. `check_equipment_availability()` and
   `manage_equipment_reservations()` already skip reservations of cancelled

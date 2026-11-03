@@ -14,7 +14,7 @@ the saved information. Jira's six acceptance criteria were verified on 8 October
 | AC3 | Zero, negative, fractional and nonnumeric quantities refused before storage | Router/component validation, SQL limits and SG2-53-B01 |
 | AC4 | A new requirement appears in Technical Support Staff's pending dashboard queue | Real queue SQL contract and SG2-53-P01 handoff |
 | AC5 | Support saves arrangement notes and a shortfall; the coordinator sees both | Arrangement RPC/component tests and SG2-53-P01/P02 |
-| AC6 | Each item has a venue/position pair, visible to Safety Officer through the read-only API; absent placement says **Not recorded**; the venue must be one the event has requested or booked | Role/placement SQL checks (including `placement-unrelated-venue-refused`, `placement-pending-request-venue`, `placement-booked-venue`, `placement-venue-choices`) and SG2-53-P01/P02; full SG2-91 safety workflow is subsequent work |
+| AC6 | Each item has a venue/position pair, visible to Safety Officer through the read-only API; absent placement says **Not recorded**; the venue must be one the event has requested or booked | Role/placement SQL checks (including `placement-unrelated-venue-refused`, `placement-pending-request-venue`, `placement-booked-venue`, `placement-venue-choices`) and SG2-53-P01/P02; the Safety Officer's safety-check workflow built on it is SG2-91/92 (see [safety checks](safety-checks.md)) |
 
 Requests describe demand. They do not reserve equipment, promise available stock
 or change quantity held. Maintenance/damaged catalogue types remain selectable

@@ -4,8 +4,8 @@ The internal dashboard reads Supabase through `GET /api/work-queue`. Selecting a
 card reads `GET /api/work-queue/:kind/:itemId` and opens that exact event or
 request, including its stored facts and Singapore-time window. `Refresh` rereads
 the current view; returning from details refreshes the list. No production
-request falls back to mock content. Organiser and attendee dashboards retain
-their existing behavior.
+request falls back to mock content. Organisers' dashboards retain their existing
+behavior; the Attendee has no dashboard, only **Find events** and **My registrations**.
 
 ## Queue rules
 
@@ -159,11 +159,10 @@ authenticated access is revoked; privileged server workflows own request writes.
 RLS is enabled and forced on both new tables. No shared sample data is inserted.
 
 SG2-41 covers gathering and opening work. Request creation, coordinator
-assignment and approval/rejection mutations remain separate workflows. Their
-future server operations should write the new request tables. The old standalone
-booking-approval and equipment-reservation prototype screens are not connected
-to these queue records. Staff reach them only through the nav **Preview** menu,
-which labels them as sample data, so they are not mistaken for the live queue.
+assignment and the approval/rejection decisions are separate workflows with
+their own documents (for example [venues](venues.md) and
+[equipment requirements](equipment-requirements.md)) and write these request
+tables through privileged server operations.
 Event cards show the client organisation, not a repeat of the event title. Until real requests are created, those staff dashboards
 correctly show empty queues.
 

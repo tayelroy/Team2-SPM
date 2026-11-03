@@ -17,20 +17,20 @@ The other SG2-66 rules are documented with the features they change:
 
 ## Where change requests come from (SG2-64)
 
-Organisers raise change requests through SG2-64 (see [change requests](change-requests.md)),
-stored in `event_change_requests`. Deciding on one with a refusal is SG2-65. The handlers
-read them through one interface:
+Organisers raise change requests through SG2-64 and the assigned coordinator accepts or refuses
+them through SG2-65 (see [change requests](change-requests.md)), stored in
+`event_change_requests`. The handlers read them through one interface:
 
 ```ts
 interface ChangeRequestSource {
   list(event): Promise<ChangeRequest[]>;         // pending requests, oldest first
-  get(event, id): Promise<ChangeRequest | null>; // null when unknown or accepted
-  markAccepted(event, id): Promise<void>;
+  get(event, id): Promise<ChangeRequest | null>; // null when unknown or already decided
+  decide(event, id, decision): Promise<'ok' | 'not_pending' | 'not_found'>;
 }
 ```
 
 The production `source` is `createDatabaseChangeRequestSource`
-(`server/src/db/changeRequests.ts`); accepting marks the request `accepted`. The in-memory
+(`server/src/db/changeRequests.ts`); accepting records the decision on the request. The in-memory
 mock in `server/src/changeRequests/mockChangeRequests.ts` is now only a test fixture: the
 unit tests and the e2e change-impact and safety-approval journeys opt their events in to it
 (`e2e/support/change-requests.ts`), so their ids stay stable. Per process, it seeds three
@@ -141,7 +141,7 @@ All three are for the event's assigned Event Coordinator (`event_request.change_
 
 | route | result |
 | --- | --- |
-| `GET /api/event-requests/:eventId/change-requests` | `{ source: 'mock', event, can_accept, change_requests: [{ id, requested_at, reason, status, changes, significant, impact }] }` |
+| `GET /api/event-requests/:eventId/change-requests` | `{ event, can_accept, next_step_required, change_requests: [{ id, requested_at, reason, status, changes, significant, impact }] }` |
 | `POST /api/event-requests/:eventId/change-requests/:id/accept` | 200 `{ event_id, previous_status, status, returned_to_planning, arrangements_recheck_needed, outstanding_arrangements }`; 404 unknown or accepted request; 409 status cannot change or stale; 400 `Invalid change` with schedule details |
 | `POST /api/event-requests/:eventId/rechecks/:key/settle` | 200 `{ event_id, arrangements_recheck_needed, outstanding_arrangements }`; 400 unknown key; 409 not outstanding, stale, or `blockers` |
 

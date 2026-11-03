@@ -33,8 +33,8 @@ Safety-rejected events remain active and can still request cancellation.
   request always has a reason of at most 500 characters and that a
   cancellation time is only stored on a cancelled event.
 - A rejected event cannot be asked about or cancelled: it will not happen anyway.
-  The database is the authority here; `STATUS_TRANSITIONS` in
-  `server/src/events/fields.ts` lists the organiser's own edit transitions.
+  The database is the authority here: `cancel_event()` and
+  `request_event_cancellation()` check the status themselves.
 - `request_event_cancellation(event, reason)` records the request, adds a
   `cancellation_request` history entry, and sends the assigned coordinator a
   `cancellation_requested` notice. An event still waiting for a coordinator

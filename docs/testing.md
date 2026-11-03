@@ -268,7 +268,7 @@ For **SG2-44 — View venue availability** (backend slice), keep these five case
 
 The endpoint enforces the policy itself; the frontend screen
 ([client/src/screens/AvailabilityCalendar.tsx](../client/src/screens/AvailabilityCalendar.tsx))
-still renders mock data until the client has a login session (SG2-23).
+reads this endpoint through `client/src/venues/availability.ts` and the signed-in session.
 
 Each spreadsheet record should contain the course fields: unique Test Case ID,
 scenario, preconditions (including fixture/reset), numbered test steps, specific

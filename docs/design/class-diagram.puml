@@ -1,21 +1,18 @@
-' ConnectSphere domain class model (SG2-95), as of PR90 head 61416cc (16 Oct 2026).
-' Three diagrams, one per area; each renders to its own page.
+' ConnectSphere domain class model (SG2-95), as of main 4881413 (3 Nov 2026).
+' Five diagrams, one per area; each renders to its own page.
 ' Attributes are the persisted fields (supabase/migrations) in domain form;
 ' operations name the real RPC / handler that changes the object.
 ' Sources per element: docs/design/model-notes.md.
 
 @startuml class-events-people
 !pragma layout smetana
-title ConnectSphere domain model (1/3): events, people & coordination\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere domain model (1/5): events, people & coordination\nas of main 4881413 (3 Nov 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11
 skinparam class {
   BackgroundColor #FFFFFF
   BackgroundColor<<Week 7>> #FFF4CC
-  BackgroundColor<<planned>> #DDDDDD
-  BorderStyle<<planned>> dashed
-  BorderColor<<planned>> #777777
 }
 
 enum EventStatus {
@@ -57,8 +54,9 @@ class User {
 class AccountRole {
   userId : uuid
   role : AccountRoleName
+  .. one row per role held; key (userId, role): SG2-104 ..
   --
-  changeAccountRoles()
+  change_account_roles()
 }
 
 class Role {
@@ -71,13 +69,19 @@ class Event {
   eventId : int
   organisation : string [0..1]
   name, purpose, description : string [0..1]
+  category : conference|workshop|seminar|training|
+    networking|social|other [0..1]  «SG2-70»
   proposedDate : timestamptz [0..1]
   expectedAttendance : int [0..1]
   venueRequirements, accessibilityNeeds : string [0..1]
+  preferredLayout : string [0..1]  «SG2-105»
+  <back:#FFF4CC>expectedCrowdMovement : string [0..1] «W7 SG2-91»</back>
   equipmentRequirements : string [0..1]
   registrationNeeded : boolean [0..1]
   registrationCapacity : int [0..1]
   registrationOpensAt, registrationClosesAt : timestamptz [0..1]
+  registrationAnnounced : open|closed [0..1]  «SG2-63»
+  {field} waitingListResponseHours : int = 24 (1..168)  «SG2-61»
   planningNotes : string [0..1]
   arrangementsRecheckNeeded : boolean
   outstandingArrangements : jsonb
@@ -86,15 +90,27 @@ class Event {
   <back:#FFF4CC>submittedAt : timestamptz [0..1] «W7 SG2-87»</back>
   <back:#FFF4CC>completedBy / completedAt [0..1] «W7 SG2-100»</back>
   confirmedBy / confirmedAt [0..1]
+  <back:#FFF4CC>coordinatorAssignedBy : uuid [0..1] «W7 SG2-89»</back>
+  <back:#FFF4CC>awaitingSafetyCheckSince : timestamptz [0..1] «W7 SG2-91»</back>
+  <back:#FFF4CC>safetyCheckRevision : bigint «W7 SG2-91»</back>
+  cancellationRequestedAt / By / Reason [0..1]  «SG2-67»
+  cancelledAt / cancelledBy [0..1]  «SG2-67»
   --
-  STATUS_TRANSITIONS / canTransition()
-  confirm_event() «202610170002»
+  update_event_request_draft()
+  confirm_event() «202610290001»
 }
 
 class CoordinatorAssignment <<Week 7>> {
   .. no table: events.coordinator_id ..
   assignEventCoordinator()
   fetchUnassignedQueue()
+  fetchSupervisedEvents() «SG2-89 oversight»
+}
+
+class ActingRole {
+  .. no table: X-Acting-Role header ..
+  acting_role()
+  lock_acting_role()
 }
 
 class EventAuditLog {
@@ -111,11 +127,6 @@ class Clarification {
   createdAt : timestamptz
 }
 
-class Registration {
-  registrationId : int
-  status : string [0..1]
-}
-
 enum NotificationKind {
   venue_request_approved
   venue_request_rejected
@@ -129,6 +140,24 @@ enum NotificationKind {
   event_approved
   event_rejected
   <back:#FFF4CC>venue_unavailable «W7 SG2-81»</back>
+  event_returned_to_planning «SG2-66»
+  <back:#FFF4CC>safety_decision «W7 SG2-92»</back>
+  outstanding_arrangements «SG2-69»
+  registration_opened «SG2-63»
+  registration_closed «SG2-63»
+  <back:#FFF4CC>venue_booking_cancelled «W7 SG2-83»</back>
+  <back:#FFF4CC>venue_change_requested «W7 SG2-83»</back>
+  cancellation_requested «SG2-67»
+  event_cancelled «SG2-67»
+  registration_confirmed «SG2-60»
+  change_requested «SG2-64»
+  registration_withdrawn «SG2-62»
+  change_accepted «SG2-65»
+  change_refused «SG2-65»
+  event_changed «SG2-102»
+  registration_full «SG2-61»
+  waiting_list_offer «SG2-61/62»
+  waiting_list_offer_lapsed «SG2-61/62»
 }
 
 class Notification {
@@ -136,10 +165,23 @@ class Notification {
   kind : NotificationKind
   message : string
   createdAt : timestamptz
+  readAt : timestamptz [0..1]  «SG2-69»
+  --
+  notification_inbox()
+  read_notification()
+  read_all_notifications()
 }
 
-class SafetyCheck <<planned>> #DDDDDD;line.dashed;line:777777 {
-  .. SG2-91/92/93/94: no table or RPC at this snapshot ..
+class NotificationReminderSettings {
+  {field} frequencyDays : int (1..30) = 1
+  --
+  set_notification_reminder_preferences()
+}
+
+class NotificationReminderReceipt {
+  lastSentAt : timestamptz
+  --
+  send_outstanding_arrangement_reminders() «pg_cron hourly»
 }
 
 User "1" -- "0..1" AccountRole : has >
@@ -156,13 +198,12 @@ Event "1" *-- "*" EventAuditLog
 EventAuditLog "*" -- "0..1" User : actor >
 Event "1" *-- "*" Clarification
 Clarification "*" -- "1" User : sender >
-Event "1" *-- "*" Registration
-Registration "*" -- "1" User : attendee >
 Notification "*" -- "1" User : recipient >
 Notification "*" -- "0..1" Event : about >
-
-SafetyCheck "*" .. "1" Event : checks (awaiting_safety_check) >
-SafetyCheck "*" .. "1" User : decided by Safety Officer >
+NotificationReminderSettings "0..1" -- "1" User : coordinator's cadence >
+NotificationReminderReceipt "*" -- "1" Event
+NotificationReminderReceipt "*" -- "1" User : recipient >
+AccountRole ..> ActingRole : request acts as one held role
 
 note right of CoordinatorAssignment
   Event Coordinator Lead only (event_request.assign_coordinator).
@@ -172,33 +213,37 @@ note right of CoordinatorAssignment
   Queue: GET /api/assignment-queue (SG2-87/97).
 end note
 
-note bottom of SafetyCheck
-  <<planned>> SG2-91/92/93/94 (epic SG2-76).
-  Statuses already exist (SG2-100):
-  awaiting_safety_check -> preparation | safety_rejected | planning.
+note bottom of ActingRole
+  SG2-104: an account may hold several roles; each request
+  acts as exactly one, named in X-Acting-Role (default: the
+  least-privileged role held). The database repeats the choice
+  in acting_role(), so RLS never grants more than the account holds.
+end note
+
+note bottom of Notification
+  In-app only. Hold notices (venue_hold_notifications) are a
+  separate table, merged into the same inbox (SG2-69). Cancelled
+  events and registrations are announced by event_cancelled /
+  registration_* kinds (SG2-60/61/62/63/67).
 end note
 
 legend bottom left
   |= Marker |= Meaning |
-  |<back:#FFFFFF>   plain   </back>| built before Week 7 |
-  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built at this snapshot (story id) |
-  |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
-  Multiplicity [0..1] = nullable column.
+  |<back:#FFFFFF>   plain   </back>| built before Week 7, or by a later backlog story (story id where given) |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change (story id) |
+  Multiplicity [0..1] = nullable column. SG2-xx without a marker colour = later backlog story.
 endlegend
 @enduml
 
 @startuml class-venues-bookings
 !pragma layout smetana
-title ConnectSphere domain model (2/3): venues, availability & bookings\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere domain model (2/5): venues, availability & bookings\nas of main 4881413 (3 Nov 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11
 skinparam class {
   BackgroundColor #FFFFFF
   BackgroundColor<<Week 7>> #FFF4CC
-  BackgroundColor<<planned>> #DDDDDD
-  BorderStyle<<planned>> dashed
-  BorderColor<<planned>> #777777
   BackgroundColor<<ref>> #E8F0FE
 }
 
@@ -214,6 +259,9 @@ class Venue {
   facilities : string [0..1]
   accessibilityFeatures : string [0..1]
   operatingInformation : string [0..1]
+  <back:#FFF4CC>deletedAt / deletedBy : [0..1] «W7 SG2-106: soft delete»</back>
+  --
+  <back:#FFF4CC>delete_venue() «W7 SG2-106»</back>
 }
 
 class VenueOperations <<Week 7>> {
@@ -264,6 +312,7 @@ class VenueBookingRequest {
   decidedBy / decidedAt / decisionReason [0..1]
   <back:#FFF4CC>withdrawnBy / withdrawnAt [0..1] «W7 SG2-82»</back>
   <back:#FFF4CC>replacesBookingId : bigint [0..1] «W7 SG2-81»</back>
+  <back:#FFF4CC>{field} changeReason : string [0..1] (only if replaces) «W7 SG2-83»</back>
   --
   decide_venue_booking_request()
   <back:#FFF4CC>withdraw_venue_booking_request() «W7 SG2-82»</back>
@@ -272,7 +321,7 @@ class VenueBookingRequest {
 class CapacityException {
   exceptionId : bigint
   approvedBy : uuid
-  approverRole : venue_staff|technical_support_staff|event_organiser
+  approverRole : venue_staff «SG2-66 AC5: other roles = inert history»
   expectedAttendance : int
   venueCapacity : int [0..1]
   approvedAt : timestamptz
@@ -284,7 +333,8 @@ class VenueBooking {
   status : held|confirmed|cancelled
   cancelledBy / cancelledAt / cancellationReason [0..1]
   --
-  release_venue_booking()
+  <back:#FFF4CC>release_venue_bookings() «W7 SG2-83»</back>
+  release_venue_booking() «202610210002»
 }
 
 class BookingClash <<Week 7>> {
@@ -302,26 +352,34 @@ class VenueHold <<Week 7>> {
   createdBy : uuid
   createdAt : timestamptz
   warningSentAt : timestamptz [0..1]
+  <back:#FFF4CC>expiryRevision : int = 0 «W7 SG2-106»</back>
   --
   create_venue_hold()
   change_venue_hold(release|convert)
+  <back:#FFF4CC>change_venue_hold_expiry() «W7 SG2-106»</back>
   process_venue_hold_deadlines() «pg_cron 1/min»
 }
 
 class VenueHoldNotification <<Week 7>> {
   notificationId : bigint
   {field} recipientId : uuid (event coordinator)
-  kind : placed|warning|expired
+  kind : placed|warning|expired|expiry_changed
+  expiryRevision : int
   message : string
   createdAt : timestamptz
+  readAt : timestamptz [0..1]  «SG2-69»
 }
 
 class VenueHoldSettings <<Week 7>> {
   {field} warningLeadSeconds : int = 86400 (24 h)
 }
 
-class ChangeOneVenue <<planned>> #DDDDDD;line.dashed;line:777777 {
-  .. SG2-83: general change/cancellation flow ..
+class ChangeOneVenue <<Week 7>> {
+  .. no table: one venue of a multi-venue event, SG2-83 ..
+  release_venue_bookings(bookingId, alsoCancel[], reason)
+  replacement request with changeReason (SG2-81 path)
+  notify_venue_staff()
+  return_event_to_planning_for_venue()
 }
 
 Venue "1" *-- "0..1" VenueOperations
@@ -342,6 +400,8 @@ VenueUnavailability "1" -- "*" VenueBookingDisruption
 VenueBookingDisruption "*" -- "1" VenueBooking : flags confirmed >
 VenueBooking "1" -- "*" BookingClash : clashes with (pair) >
 VenueBookingRequest "*" --> "0..1" VenueBooking : replaces (SG2-81) >
+ChangeOneVenue ..> VenueBooking : cancels one (+ any named)
+ChangeOneVenue ..> VenueBookingRequest : change = replacement request
 
 note bottom of VenueOperations
   Setup before + turnaround after widen every
@@ -359,15 +419,26 @@ note bottom of VenueBookingDisruption
 end note
 
 note bottom of ChangeOneVenue
-  SG2-83 remains planned; distinct from built
-  replacement of an unavailable booking.
+  SG2-83 (202610210002): only the event's assigned coordinator
+  cancels a booking (venue_bookings.release); other bookings of
+  the event are cancelled only when named in the same call. Each
+  cancellation keeps who, when and why on the booking and in the
+  event history; Venue Staff get venue_booking_cancelled /
+  venue_change_requested notices. On a Confirmed or Preparation
+  event the event returns to Planning with a venue recheck.
+end note
+
+note bottom of Venue
+  SG2-106: delete_venue() refuses while the venue has a current or
+  future booking, a live hold on a current or future period
+  or a pending request, and otherwise
+  keeps the row (deletedAt) so history still shows its name.
 end note
 
 legend bottom left
   |= Marker |= Meaning |
-  |<back:#FFFFFF>   plain   </back>| built before Week 7 |
-  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built at this snapshot (story id) |
-  |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
+  |<back:#FFFFFF>   plain   </back>| built before Week 7, or by a later backlog story |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change (story id) |
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
   Event 1–* VenueBooking: one event may hold several venues (SG2-82).
 endlegend
@@ -375,7 +446,7 @@ endlegend
 
 @startuml class-equipment
 !pragma layout smetana
-title ConnectSphere domain model (3/3): equipment\nas of PR90 head 61416cc (16 Oct 2026)
+title ConnectSphere domain model (3/5): equipment\nas of main 4881413 (3 Nov 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11
@@ -416,6 +487,7 @@ class EquipmentRequest {
   notes, arrangementNotes : string [0..1]
   shortfall : int [0..1]
   placementPosition : string [0..1]
+  .. placement venue must be one the event uses (SG2-53 AC6) ..
   version : bigint
   --
   manage_equipment_requirements()
@@ -426,8 +498,10 @@ class EquipmentReservation {
   quantityReserved : int
   startsAt, endsAt : timestamptz [0..1]
   reservedAt : timestamptz [0..1]
+  releasedAt / releasedBy / releaseReason [0..1]  «SG2-56»
   --
   manage_equipment_reservations()
+  release_cancelled_event_equipment() «trigger, SG2-56»
 }
 
 Event "1" *-- "*" EquipmentRequest
@@ -443,6 +517,248 @@ legend bottom left
   |<back:#FFFFFF>   plain   </back>| built (SG2-52/53/54/55) |
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
   No Week 7 change touches equipment; placement
-  is read by the Safety Officer (SG2-53 AC6).
+  is read by the Safety Officer (SG2-53 AC6). A cancelled
+  event releases its reservations (SG2-56). Required
+  equipment not yet requested counts as outstanding (SG2-57).
+endlegend
+@enduml
+
+@startuml class-safety-changes
+!pragma layout smetana
+title ConnectSphere domain model (4/5): safety check, change requests & cancellation\nas of main 4881413 (3 Nov 2026)
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+class Event <<ref>> {
+  eventId : int
+  status : EventStatus
+  outstandingArrangements : jsonb
+  safetyCheckRevision : bigint
+}
+class User <<ref>> {
+  userId : uuid
+}
+class VenueBookingRequest <<ref>> {
+  requestId : bigint
+}
+class EquipmentRequest <<ref>> {
+  requestId : bigint
+}
+
+class SafetyCheck <<Week 7>> {
+  .. no table: events in awaiting_safety_check, SG2-91 ..
+  safety_check_queue()
+  refresh_safety_check_status() «trigger path»
+  event_safety_approved()
+  safety_approval_gate «trigger, SG2-94»
+}
+
+class SafetyDecision <<Week 7>> {
+  decisionId : bigint
+  decision : approve|reject|request_changes
+  {field} reason : string [0..1] (<= 2000)
+  {field} arrangements : venue|equipment|other (array)
+  decidedBy : uuid
+  decidedAt : timestamptz
+  --
+  record_safety_decision() «SG2-92»
+  rework_safety_rejected_event() «SG2-92 AC4»
+}
+
+class SafetyRereview <<Week 7>> {
+  reviewId : bigint
+  arrangement : venue|equipment
+  flaggedAt : timestamptz
+  resolution : confirmed|withdrawn [0..1]
+  resolvedBy / resolvedAt [0..1]
+  --
+  safety_rereview_queue()
+  confirm_safety_rereview() «SG2-93»
+}
+
+class EventChangeRequest {
+  changeRequestId : bigint
+  field : proposed_date|expected_attendance|venue_requirements|
+    accessibility_needs|equipment_requirements|name|purpose|description
+  fromValue : jsonb [0..1]
+  toValue : jsonb
+  {field} reason : string (<= 1000)
+  status : pending|accepted|refused
+  createdAt : timestamptz
+  decidedBy / decidedAt [0..1]  «SG2-65»
+  {field} decisionReason : string [0..1]  (required when refused)
+  --
+  raise_event_change_request() «SG2-64»
+  apply_accepted_event_change() «SG2-66»
+  decide_event_change_request() «SG2-65»
+  settle_arrangement_recheck() «SG2-66»
+}
+
+class EventCancellation {
+  .. no table: events.cancellation_* and cancelled_* columns, SG2-67 ..
+  request_event_cancellation()
+  cancel_event()
+  keep_cancelled_events_cancelled() «trigger»
+}
+
+SafetyCheck "*" .. "1" Event : checks (awaiting_safety_check) >
+SafetyCheck ..> SafetyDecision : decided by
+SafetyDecision "*" -- "1" Event : about >
+SafetyDecision "*" -- "1" User : decided by Safety Officer >
+SafetyRereview "*" -- "1" SafetyDecision : sent back by >
+SafetyRereview "*" -- "1" Event
+SafetyRereview "*" -- "0..1" VenueBookingRequest : venue (Venue Staff)
+SafetyRereview "*" -- "0..1" EquipmentRequest : equipment (Technical Support)
+SafetyRereview "*" -- "0..1" User : resolved by >
+
+EventChangeRequest "*" -- "1" Event : about >
+EventChangeRequest "*" -- "1" User : requested by organiser >
+EventChangeRequest "*" -- "0..1" User : decided by coordinator >
+(Event, User) .. EventCancellation
+
+note bottom of SafetyDecision
+  Append-only (select + insert only). The latest decision, when
+  Approve and the event is still in Preparation or Confirmed, is
+  the event's safety approval. Approve -> preparation; Reject ->
+  safety_rejected (coordinator rework -> planning, safety_other_recheck
+  outstanding); Request Changes -> planning, named arrangements marked
+  safety_venue_recheck / safety_equipment_recheck / safety_other_recheck.
+  A decision on a stale safetyCheckRevision is refused (202610190006).
+end note
+
+note bottom of SafetyCheck
+  Hand-off (SG2-91): an Approved or Planning event with every venue
+  request approved and every required equipment reserved moves to
+  awaiting_safety_check; it moves back to Planning when one falls
+  through. Preparation is reachable only through an Approve decision
+  (SG2-94); confirm_event() lists 'safety' as outstanding otherwise.
+end note
+
+note bottom of EventChangeRequest
+  Service-role only; the API shows a request to the owning organiser
+  and the assigned coordinator. Accepting a significant change on a
+  Preparation or Confirmed event returns it to Planning and marks
+  venue_recheck / equipment_recheck / registration_recheck outstanding.
+end note
+
+note bottom of EventCancellation
+  The creating organiser asks with a reason; only the assigned coordinator
+  cancels. cancel_event() releases not-yet-ended bookings and tentative holds,
+  cancels pending venue and equipment requests; the SG2-56 trigger releases
+  equipment reservations. Registered attendees and the organiser get
+  event_cancelled. A cancelled event never changes status again.
+end note
+
+legend bottom left
+  |= Marker |= Meaning |
+  |<back:#FFFFFF>   plain   </back>| built by a later backlog story (SG2-64/65/66/67) |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change #6, operational safety check (SG2-91/92/93/94) |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  Multiplicity [0..1] = nullable column.
+endlegend
+@enduml
+
+@startuml class-registrations
+!pragma layout smetana
+title ConnectSphere domain model (5/5): registrations & waiting list\nas of main 4881413 (3 Nov 2026)
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+class Event <<ref>> {
+  eventId : int
+  registrationCapacity : int [0..1]
+  registrationOpensAt, registrationClosesAt : timestamptz [0..1]
+  registrationAnnounced : open|closed [0..1]
+  waitingListResponseHours : int = 24
+}
+class User <<ref>> {
+  userId : uuid
+}
+class Notification <<ref>> {
+  kind = registration_* / waiting_list_* / event_changed
+}
+
+class Registration {
+  registrationId : int
+  {field} status : string = 'registered'  ('cancelled' = withdrawn)
+  registeredAt : timestamptz
+  {field} contactPhone : string [0..1]  (8 Singapore digits)
+  {field} needs : string [0..1]  (<= 500)
+  withdrawnAt : timestamptz [0..1]
+  --
+  register_for_event() «SG2-60»
+  my_registrations() «SG2-62»
+  withdraw_registration() «SG2-62»
+}
+
+class WaitingListEntry {
+  entryId : bigint
+  status : waiting|offered|registered|left|lapsed
+  joinedAt : timestamptz
+  offeredAt : timestamptz [0..1]
+  offerExpiresAt : timestamptz [0..1]
+  endedAt : timestamptz [0..1]
+  --
+  join_waiting_list() «SG2-61»
+  leave_waiting_list() «SG2-61»
+  process_waiting_list_offers() «pg_cron 1/min»
+}
+
+class RegistrationSettings {
+  .. no table: events.registration_capacity, _opens_at, _closes_at ..
+  update_registration_settings() «SG2-63, creating organiser»
+  event_registration_overview() «SG2-63 / SG2-61 AC7»
+  registrable_events() / registrable_event() «SG2-59»
+  process_registration_windows() «pg_cron 1/min»
+}
+
+class AttendeeEventDetails {
+  .. private schema: private.event_attendee_details ..
+  proposedDate : timestamptz [0..1]
+  venueIds : int[]
+  venueNames : string [0..1]
+  --
+  event_attendee_details_changed «deferred trigger, SG2-102»
+}
+
+Event "1" *-- "*" Registration
+Registration "*" -- "1" User : attendee >
+Event "1" *-- "*" WaitingListEntry
+WaitingListEntry "*" -- "1" User : attendee >
+Event "1" -- "0..1" AttendeeEventDetails
+(Event, User) .. RegistrationSettings
+AttendeeEventDetails ..> Notification : one event_changed per active registration
+
+note bottom of Registration
+  One active registration per attendee per event (partial unique
+  index on status <> 'cancelled'). Every place-holding write locks the
+  event row first, so the last place is decided one attempt at a time.
+  Registration is open for a confirmed event that needs registration,
+  from opens_at (inclusive) to closes_at (exclusive).
+end note
+
+note bottom of WaitingListEntry
+  First come first served; one active (waiting or offered) entry per
+  attendee per event. A withdrawal or a capacity increase offers the
+  freed place to the first waiting attendee for waitingListResponseHours
+  (or until registration closes); an unused offer lapses and passes on.
+end note
+
+legend bottom left
+  |= Marker |= Meaning |
+  |<back:#FFFFFF>   plain   </back>| built by Sprint 4 stories (SG2-59/60/61/62/63/102) |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  Multiplicity [0..1] = nullable column.
 endlegend
 @enduml

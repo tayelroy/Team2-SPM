@@ -41,6 +41,7 @@ Following explicit action-time confirmation, the new Capacity Room block was rem
 
 - SG2-58 confirmation requires a legitimate Preparation event. Current Safety writers SG2-91–94 remain planned; visible arrangement readiness does not establish Safety approval. SG2-100's literal Safety-readiness clause remains a delivery dependency.
 - SG2-58 AC3 depends on production attendee registration SG2-59–63. Attendee prototype screens do not fulfil it. Completion and the Preparation/Confirmed→Planning reversal need legitimate eligible fixtures; no hosted state or time was fabricated.
+- Note (3 Nov 2026): later work superseded the two statements above. Safety writers SG2-91–94 and attendee registration SG2-59–63 are now merged on main 4881413; this 16 Oct run was not repeated.
 - Incomplete submission and direct-edit protection were observed as UI prevention. Server refusal, role/ownership denial, null/range and concurrency branches retain their CI/native/API evidence; every such branch is not a new mandatory hosted journey.
 - Coordinator2 correctly displays “No phone number on file”; this does not prove a populated contact value. Masked profile phone evidence, Safety projections and venue-audit provenance retain their stated qualifications.
 - The seven engineering Tasks require their own repository/design/setup evidence. Branch protection/access, independent PR review, clean setup replay, usability and performance measurements are separate from these business journeys. Automated reviewer tests are not human approval.

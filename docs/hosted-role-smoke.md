@@ -50,7 +50,9 @@ roles with that grant. It also opens:
 - Technical Support equipment;
 - Lead queue and assignment page without selecting or saving assignments;
 - Safety's explicit placeholder and Attendee prototype pages, qualified as
-  rendered prototypes rather than completed safety/registration workflows.
+  rendered prototypes rather than completed safety/registration workflows
+  (as at that run; the Safety Officer's safety-check desk and the Attendee's
+  registration screens were built afterwards, SG2-91–94 and SG2-59–62).
 
 New request is inspected as an untouched form. No draft edit, submit, save,
 approval, rejection, assignment, reservation, release or registration action is
