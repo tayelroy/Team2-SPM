@@ -47,7 +47,7 @@ All routes require a verified bearer token and send `Cache-Control: no-store`.
 | `POST /api/venue-holds/:id/convert` | Venue Staff; approval of an active hold's pending request; `200 { hold }`. |
 | `POST /api/venue-holds/:id/release` | Venue Staff; early release of an active hold; `200 { hold }`. |
 | `POST /api/venue-holds/:id/expiry` | SG2-106. Venue Staff; `{ expires_at }` with an explicit zone, in the future and different from the current expiry; `200 { hold }`. Expired, converted or released holds return 409. The coordinator gets an `expiry_changed` notice, the warning is reset to the new time, and `event_audit_logs` records `venue_hold_expiry` with the actor and old and new times. |
-| `GET /api/venue-holds/notifications` | Internal users receive only their own persisted notifications. The existing bell loads these on sign-in, refreshes every 30 seconds and on window focus, and shares current notices with the open drawer. Opening the drawer refreshes immediately; failures can be retried. |
+| `GET /api/venue-holds/notifications` | Internal users receive only their own persisted hold notifications. The shipped client no longer calls this route: since SG2-69 the bell reads hold notices through `GET /api/notifications/inbox`, refreshing on sign-in, every 30 seconds and on window focus (`client/src/components/HoldNotifications.tsx`). |
 
 Invalid inputs return 400, missing records 404, conflicts/inactive holds/suitability failures 409, denied access 401/403 and provider failures 503. Failed saves preserve form input. Rapid repeated submissions and decisions issue a single mutation. Account changes and unmounted views cannot display obsolete read responses.
 

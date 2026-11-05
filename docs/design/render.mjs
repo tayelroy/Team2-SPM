@@ -33,7 +33,12 @@ execFileSync('bash', [structurizr, 'export', '-w', join(here, 'connectsphere.dsl
 const c4 = Object.fromEntries(readdirSync(work).filter(f => f.endsWith('.puml'))
   .map(f => [f.replace(/^structurizr-|\.puml$/g, ''), plantuml(join(work, f))]));
 
-const markdown = file => execFileSync('npx', ['-y', 'marked@14', '--gfm', '-i', join(here, file)], { maxBuffer: 1 << 26 }).toString();
+// marked's CLI can exit before a piped stdout flushes past 64 KiB, so write to a file.
+const markdown = file => {
+  const out = join(work, `${file}.html`);
+  execFileSync('npx', ['-y', 'marked@14', '--gfm', '-i', join(here, file), '-o', out]);
+  return readFileSync(out, 'utf8');
+};
 
 const diagrams = {
   'C4_Level1_System_Context.pdf': c4.C1_Context,
