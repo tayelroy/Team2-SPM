@@ -2705,6 +2705,7 @@
   },
   {
     "id": "DB-HISTORY-01",
+    "executed_by": "TAY ELROY",
     "title": "Organisers cannot read internal planning-notes history; internal staff still can",
     "story": "SG2-40",
     "purpose": "Check the recreated event_audit_logs_read policy hides internal-only fields (planning_notes) from the owning organiser through actual stored rows, while internal staff keep the full history.",
@@ -2850,6 +2851,7 @@
   },
   {
     "id": "SG2-40-P01",
+    "executed_by": "TAY ELROY",
     "title": "Change history lists actor, field and old/new values newest-first",
     "type": "Positive",
     "story": "SG2-40",
@@ -2871,6 +2873,7 @@
   },
   {
     "id": "SG2-40-N01",
+    "executed_by": "TAY ELROY",
     "title": "Attendees and unrelated organisers are blocked from an event's change history",
     "type": "Negative / RBAC",
     "story": "SG2-40",
@@ -2892,6 +2895,7 @@
   },
   {
     "id": "SG2-40-F01",
+    "executed_by": "TAY ELROY",
     "title": "Null actor/values and backend outage show a safe fallback with retry",
     "type": "Failure / negative",
     "story": "SG2-40",
@@ -2914,6 +2918,7 @@
   },
   {
     "id": "SG2-40-C01",
+    "executed_by": "TAY ELROY",
     "title": "[CONFLICT] A stale in-flight fetch is ignored when eventId flips mid-fetch",
     "type": "Conflict / race condition",
     "story": "SG2-40",
@@ -3394,6 +3399,7 @@
   },
   {
     "id": "SG2-86-P01",
+    "executed_by": "TAY ELROY",
     "title": "a new Week 7 role signs in, sees its own role and is denied ungranted operations",
     "type": "Positive / role isolation / responsive",
     "story": "SG2-86",
@@ -3744,6 +3750,7 @@
   },
   {
     "id": "SG2-100-P01",
+    "executed_by": "TAY ELROY",
     "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
     "type": "Positive",
     "story": "SG2-100",
@@ -3786,6 +3793,7 @@
   },
   {
     "id": "SG2-100-P02",
+    "executed_by": "TAY ELROY",
     "title": "marking a held event completed makes it read-only, clears it from the work queue and is recorded in history",
     "type": "Positive / boundary",
     "story": "SG2-100",
@@ -10282,6 +10290,7 @@
   },
   {
     "id": "SG2-96-E2E02",
+    "executed_by": "LIM JUN WEI",
     "title": "Mobile evidence shows attendee registration and confirmed withdrawal",
     "type": "NORMAL",
     "story": "SG2-96",
@@ -10307,6 +10316,7 @@
   },
   {
     "id": "SG2-96-E2E03",
+    "executed_by": "LIM JUN WEI",
     "title": "Mobile evidence shows coordinator change refusal and acceptance",
     "type": "NORMAL",
     "story": "SG2-96",
@@ -10332,6 +10342,7 @@
   },
   {
     "id": "UI-RELEASE-01",
+    "executed_by": "LIM JUN WEI",
     "title": "mobile and desktop landing footer remain reachable through native scrolling",
     "type": "Positive",
     "story": "SG2-96",
@@ -10348,6 +10359,7 @@
   },
   {
     "id": "UI-RELEASE-02",
+    "executed_by": "LIM JUN WEI",
     "title": "authenticated phone headers remain compact and navigation remains operable",
     "type": "Positive",
     "story": "SG2-96",
@@ -10364,6 +10376,7 @@
   },
   {
     "id": "UI-RELEASE-03",
+    "executed_by": "LIM JUN WEI",
     "title": "venue editing and organiser request forms remain readable on phone and desktop",
     "type": "Positive",
     "story": "SG2-96",
@@ -10380,6 +10393,7 @@
   },
   {
     "id": "SG2-67-CLOSED-390",
+    "executed_by": "LIM JUN WEI",
     "title": "closed events hide cancellation actions on phone and cancelled receipts remain final",
     "type": "Positive / Negative",
     "story": "SG2-67",
@@ -10395,6 +10409,7 @@
   },
   {
     "id": "SG2-67-CLOSED-1440",
+    "executed_by": "LIM JUN WEI",
     "title": "closed events hide cancellation actions on desktop and cancelled receipts remain final",
     "type": "Positive / Negative",
     "story": "SG2-67",
@@ -10410,6 +10425,7 @@
   },
   {
     "id": "SG2-106-B02",
+    "executed_by": "LIM JUN WEI",
     "title": "Expiry pickers enforce the next future Singapore-time minute",
     "type": "BOUNDARY",
     "story": "SG2-106",
