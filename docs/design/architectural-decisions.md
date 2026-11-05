@@ -49,7 +49,7 @@ Each ADR is **Accepted**, meaning it is in force at this snapshot.
 - One API surface: 108 endpoints, all listed in `api-specification.md`.
 - Login goes through the API (`POST /api/auth/login`), and the browser never talks to Postgres directly.
 - The serverless runtime has no long-running process, so time-based work runs in the database (ADR-08) **[inference about the motive]**.
-- Each router builds its own Supabase client per request (`auth/supabase.ts`, `db/user-client.ts`). These clients use a 5 s timeout and `redirect: 'error'`.
+- User-scoped clients are built per request (`db/user-client.ts`, and the venue stores in `db/venues.ts`, `venueLayouts.ts`, `venueOperations.ts`, `venueBlocks.ts`); the service-role client from `getSupabaseAdminClient()` is one cached instance (`db/supabase.ts`). These clients use a 5 s timeout and `redirect: 'error'`.
 
 **Where:** `client/`, `server/src/app.ts`, `server/vercel.json`, `server/api/index.js`, `README.md`.
 
@@ -71,7 +71,7 @@ Each ADR is **Accepted**, meaning it is in force at this snapshot.
 
 | Mode | Client | RLS applies? | Used by |
 |---|---|---|---|
-| User-scoped | `createUserScopedClient(token)` (`db/user-client.ts`) | **Yes**. The caller's JWT (and `X-Acting-Role`) is sent to PostgREST | Venues (including delete), layouts, operations, blocks, availability, search, equipment (all), notifications and the inbox, holds (including expiry), event search, registrable events, my registrations, safety checks, and the RPC writes `confirm_event`, `decide_venue_booking_request`, `withdraw_venue_booking_request`, `release_venue_bookings`, `request_event_cancellation`, `cancel_event`, `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` |
+| User-scoped | `createUserScopedClient(token)` (`db/user-client.ts`); the venue, layout, operation and block stores build the same kind of anon-key client with `userScopedHeaders(token)` (`db/venues.ts`, `venueLayouts.ts`, `venueOperations.ts`, `venueBlocks.ts`) | **Yes**. The caller's JWT (and `X-Acting-Role`) is sent to PostgREST | Venues (including delete), layouts, operations, blocks, availability, search, equipment (all), notifications and the inbox, holds (including expiry), event search, registrable events, my registrations, safety checks, and the RPC writes `confirm_event`, `decide_venue_booking_request`, `withdraw_venue_booking_request`, `release_venue_bookings`, `request_event_cancellation`, `cancel_event`, `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list`. The decide, withdraw and release routes first load the request, event or hold through the service-role client and use the caller's token only for the RPC call (`venues/bookingRequests.ts`, `venues/bookings.ts`) |
 | Service role | `getSupabaseAdminClient()` (`db/supabase.ts`) | **No**, RLS is bypassed | Event-request handlers (`server/src/events/*` except `confirm` and `cancellation`), including change requests, safety decisions and the registration picture and settings; safety re-reviews, coordinator overview, profile, work queue, assignment queue, role update, logout, suitability, booking-request create/list/conflicts, bookings list, clashes |
 
 **Consequences.**
@@ -97,16 +97,18 @@ The RPCs are:
 | Area | Functions |
 |---|---|
 | Venue decisions | `decide_venue_booking_request` |
-| Holds | `create_venue_hold`, `change_venue_hold`, `change_venue_hold_expiry`, `process_venue_hold_deadlines` |
-| Bookings, requests, venues | `release_venue_bookings` (replaced `release_venue_booking`, SG2-83), `withdraw_venue_booking_request`, `delete_venue` |
+| Holds | `create_venue_hold`, `change_venue_hold`, `change_venue_hold_expiry` |
+| Bookings, requests, venues | `release_venue_bookings` (SG2-83; the older `release_venue_booking` remains as a wrapper that calls it, `202610210002_venue_booking_change_cancel.sql`), `withdraw_venue_booking_request`, `delete_venue` |
 | Events | `confirm_event`, `request_event_cancellation`, `cancel_event` |
 | Registration | `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` |
 | Equipment | `manage_equipment_requirements`, `manage_equipment_reservations` |
 | Notifications | `notification_inbox`, `read_notification`, `read_all_notifications`, `set_notification_reminder_preferences` |
 
-A second group is granted to `service_role` only and called by the API after its own checks, with the verified actor passed in: `raise_event_change_request`, `decide_event_change_request`, `apply_accepted_event_change`, `settle_arrangement_recheck`, `record_safety_decision`, `rework_safety_rejected_event`, `confirm_safety_rereview`, `update_event_request_draft`. Each is a single database function call; the API does not stitch their steps together.
+A second group is granted to `service_role` only and called by the API after its own checks, with the verified actor passed in: `raise_event_change_request`, `decide_event_change_request`, `apply_accepted_event_change`, `settle_arrangement_recheck`, `record_safety_decision`, `rework_safety_rejected_event`, `confirm_safety_rereview`, `update_event_request_draft`, `update_registration_settings`, `change_account_roles`. The API also reads through the service-role-only functions `event_registration_overview`, `safety_rereview_queue` and `event_safety_rereviews`. Each is a single database function call; the API does not stitch their steps together.
 
-The setup and turnaround gap is a shared internal function, `venue_preparation_gap()`. The hold sweep uses `for update skip locked` on venues so that a batch cannot deadlock (`202610050001_venue_holds.sql`).
+The hold sweep `process_venue_hold_deadlines` is also granted to `service_role` only; authenticated callers reach it only through `list_venue_holds` and `list_venue_hold_notifications`, which run it before they read (ADR-08).
+
+The setup and turnaround gap is a shared internal function, `venue_preparation_gap()` (`202610120002_setup_turnaround_checks.sql`). The hold sweep uses `for update skip locked` on venues so that a batch cannot deadlock (`202610050001_venue_holds.sql`).
 
 Constraints act as a backstop below the RPCs:
 
@@ -127,15 +129,15 @@ Constraints act as a backstop below the RPCs:
 
 **Decision.** Handlers guard their writes in two ways:
 
-- **State guards.** Each `UPDATE`/`DELETE` repeats its preconditions in the `WHERE` clause (status, `coordinator_id`, `organiser_id`). Zero rows changed means a race was lost, and the handler returns 409, 404 or 503. Examples are `assignEventCoordinator`, `completeEvent` and the SG2-90 planning guard.
-- **Version guards.** Editable inventory records carry a `version` column (equipment, equipment requests). A save that matches no `(id, version)` returns 409.
+- **State guards.** Each `UPDATE`/`DELETE` repeats its preconditions in the `WHERE` clause (status, `coordinator_id`, `organiser_id`). Zero rows changed means a race was lost, and the handler returns 409, 404 or 503. Examples are `assignEventCoordinator`, `completeEvent` and the SG2-90 planning guard (`db/eventPlanning.ts`).
+- **Version guards.** Editable inventory records carry a `version` column (equipment, equipment requests). A save that matches no `(id, version)` returns 409. These go through the user-scoped client (`db/equipment.ts`), and the equipment-request check runs inside `manage_equipment_requirements`.
 
 **Consequences.**
 
 - There are no lost updates on a single row.
 - Writes that span several statements are not atomic (Part C, items 1–2).
 
-**Where:** `server/src/db/eventRequests.ts`, `server/src/db/equipment.ts`, `server/src/events/*`.
+**Where:** `server/src/db/eventRequests.ts`, `server/src/db/eventPlanning.ts`, `server/src/db/equipment.ts`, `server/src/events/*`.
 
 ### ADR-05 Times are stored as UTC instants and shown in Singapore time
 
@@ -162,7 +164,7 @@ Constraints act as a backstop below the RPCs:
 **Decision.** A single append-only table, `event_audit_logs`, stores one row per changed field: `event_id, actor_id, field_name, old_value, new_value, created_at`.
 
 - **Status changes** are rows with `field_name = 'status'` (`statusChange()`, `server/src/db/auditLogs.ts`).
-- **Who writes the rows.** Some existing handlers write through the service-role client after the main write. RPCs write within the transaction for venue decisions, holds, release, withdraw and confirm. The SG2-40 draft-history repair adds `update_event_request_draft`: existing draft/clarification saves and all nine field diffs commit together. It locks and rechecks the verified creator, role, exact membership and editable status; only the service role may call it. Unchanged values create no history, and an audit failure rolls back the saved values. Earlier missing draft edits are not backfilled.
+- **Who writes the rows.** Some existing handlers write through the service-role client after the main write. RPCs write within the transaction for venue decisions, holds, release, withdraw and confirm. The SG2-40 draft-history repair adds `update_event_request_draft`: existing draft/clarification saves and every field diff commit together (nine fields in `202610170003`; eleven since `preferred_layout` and `category` were added, latest definition `202610200005_event_search.sql`). It locks and rechecks the verified creator, role, exact membership and editable status; only the service role may call it. Unchanged values create no history, and an audit failure rolls back the saved values. Earlier missing draft edits are not backfilled.
 - **System actions** have `actor_id = null`, for example hold expiry.
 - **Internal-only fields** (`INTERNAL_ONLY_AUDIT_FIELDS = ['planning_notes']`) are hidden from Event Organisers, both by the handler and by RLS.
 - **Venue settings** have their own history table: `venue_operation_history` is written only by a trigger (SG2-77 AC6, `202610050003_venue_operations.sql`).
@@ -183,7 +185,7 @@ Constraints act as a backstop below the RPCs:
 - **One notices table.** `public.notifications` holds one row per recipient, with a `kind` check list that each Sprint 4 migration extends. RLS lets a user `select` only their own rows; only `service_role` and SECURITY DEFINER functions can insert.
 - **Writers.** Rows come from RPCs (venue decision, release, reservation, clash refresh, confirm, cancellation, registration, change-request decisions) or from handlers through `notifyEvent()` (`server/src/db/eventNotifications.ts`, SG2-68). The actor is never notified of their own action.
 - **Reading.** `GET /api/notifications` returns the newest 50 of the `notifications` table for the roles holding `notifications.read`. Since SG2-69 every role reads through `GET /api/notifications/inbox` (`notifications.inbox`), which merges `notifications` and `venue_hold_notifications` newest first with a keyset cursor, an unread count and `read_at` (migration `202610200003_notifications_inbox_reminders.sql`); the client polls, there is no push.
-- **Hold notices** (`placed`, `warning`, `expired`, `expiry_changed`) live in the separate table `venue_hold_notifications`, read through `GET /api/venue-holds/notifications` and through the inbox. The client refreshes them every 30 s and on focus (`docs/venue-holds.md`).
+- **Hold notices** (`placed`, `warning`, `expired`, `expiry_changed`) live in the separate table `venue_hold_notifications`. The client reads them through the inbox, which it refreshes every 30 s and on window focus (`client/src/components/HoldNotifications.tsx`). `GET /api/venue-holds/notifications` still exists but the shipped client no longer calls it.
 
 **Consequences.**
 
@@ -212,7 +214,7 @@ Constraints act as a backstop below the RPCs:
 - No server timer is needed (ADR-01).
 - Notices can arrive up to one minute late, but enforcement is never late.
 
-**Where:** `supabase/migrations/202610050001_venue_holds.sql:126-150,302-312`, `202610200003`, `202610200004`, `202610280001`, `docs/venue-holds.md`.
+**Where:** `supabase/migrations/202610050001_venue_holds.sql:125-150,303-314`, `202610200003`, `202610200004`, `202610280001`, `docs/venue-holds.md`.
 
 ### ADR-09 One request, one acting role (multi-role accounts, SG2-104)
 
@@ -222,8 +224,8 @@ Constraints act as a backstop below the RPCs:
 
 - **One acting role per request.** The client names it in the `X-Acting-Role` header; `requireAuth` checks that the account holds it and runs the rest of the request, including its database calls, as that role (`server/src/auth/actingRole.ts`, `AsyncLocalStorage`). A malformed or repeated header is 400, a role not held is 403.
 - **Defaults.** With no header a single-role account acts as its role; a multi-role account acts as the least-privileged role it holds (`ACTING_ROLE_DEFAULT_ORDER`: attendee first, Technical Support last).
-- **The database re-checks.** The header is forwarded to PostgREST; `public.acting_role()` returns it only if the caller's own `account_roles` rows contain it, and `lock_acting_role()` is used by the write RPCs. The acting role only ever narrows what the account holds (`202610200002_acting_role_functions.sql`).
-- **Separation of duties.** Nobody changes their own roles: refused in `auth/roles.ts` and again in the database's `change_account_roles()` (`202610180001_account_multi_roles.sql`); `PATCH /api/users/:userId/role` replaces the whole role set and refuses to remove an account's last role. The Lead never makes an event's own organiser its coordinator, and Venue Staff never decide a venue request they raised themselves (`202610180003_separation_of_duties.sql`, `202610200002_acting_role_functions.sql`).
+- **The database re-checks.** The header is forwarded to PostgREST; `public.acting_role()` returns it only if the caller's own `account_roles` rows contain it, and `lock_acting_role()` makes the same choice while locking those rows. Both are defined in `202610180001_account_multi_roles.sql`; `202610200002_acting_role_functions.sql` makes the write RPCs use them. The acting role only ever narrows what the account holds.
+- **Separation of duties.** Nobody changes their own roles: refused in `auth/roles.ts` and again in the database's `change_account_roles()` (`202610180001_account_multi_roles.sql`). `PATCH /api/users/:userId/role` uses that function's `replace` action, which leaves the account with exactly the one role given; the function's `last_role` refusal belongs to its `remove` action, which no API route calls. The Lead never makes an event's own organiser its coordinator, and Venue Staff never decide a venue request they raised themselves (`202610180003_separation_of_duties.sql`, `202610200002_acting_role_functions.sql`).
 
 **Consequences.**
 
@@ -240,7 +242,7 @@ Constraints act as a backstop below the RPCs:
 **Decision.**
 
 - **Lock first.** `register_for_event`, `withdraw_registration`, `join_waiting_list`, `leave_waiting_list` and the capacity change all lock the event row before reading counts, so the last place is decided one attempt at a time.
-- **Offers, not auto-registration.** A freed place (a withdrawal, or a capacity increase) is offered to the first waiting attendee (`waiting_list_offer` notice) and held for them for `events.waiting_list_response_hours` (1 to 168, default 24, team decision 28 Oct 2026), or until registration closes if sooner. A place counts as held by an active registration or an unexpired offer (`private.places_held`).
+- **Offers, not auto-registration.** A freed place (a withdrawal, or a capacity increase) is offered to the first waiting attendee (`waiting_list_offer` notice) and held for them for `events.waiting_list_response_hours` (1 to 168, default 24, team decision 28 Oct 2026), or until registration closes or the event starts, whichever is sooner. A place counts as held by an active registration or an unexpired offer (`private.places_held`).
 - **Lapse.** An unanswered offer lapses (`waiting_list_offer_lapsed`) and the place passes to the next attendee. The `waiting-list-offers` pg_cron job catches lapsed offers every minute (ADR-08) and every write catches them first.
 - **Rules in the schema.** One active entry per attendee per event (partial unique index `waiting_list_one_active_per_attendee`); statuses `waiting`, `offered`, `registered`, `left`, `lapsed`.
 
@@ -255,9 +257,9 @@ Constraints act as a backstop below the RPCs:
 **Decision.**
 
 - **Trigger gate.** `safety_approval_gate` refuses any move into `preparation` unless the event is leaving `awaiting_safety_check` on an Approve decision made during that wait; `record_safety_decision()` is the only writer that passes (`202610220001_safety_approval_gate.sql`). `confirm_event()` additionally lists `safety` as outstanding unless a current approval exists.
-- **Stale-review guard.** `events.safety_check_revision` changes whenever an event moves into or out of the check; a decision carries the revision the Safety Officer reviewed and is refused (409 `code: "stale"`) if the event has since changed (`202610190006_safety_decision_revision.sql`).
+- **Stale-review guard.** `events.safety_check_revision` (`202610190004_safety_check_queue.sql`) changes whenever an event moves into or out of the check, and when the reviewed fields or arrangements change while it waits; a decision carries the revision the Safety Officer reviewed and is refused (409 `code: "stale"`) if the event has since changed (`202610190006_safety_decision_revision.sql`).
 - **History is append-only.** Decisions go to `event_safety_decisions`; an approval stops counting when the event leaves Preparation/Confirmed, without editing the history.
-- **Request Changes** sends named venue bookings or equipment requests back to Venue Staff or Technical Support (`safety_rereviews`), and the event waits in Planning with `safety_*_recheck` keys until each is confirmed again and the coordinator settles the rest (`202610240001_safety_changes_requested.sql`). Rework of a Safety Rejected event leaves an explicit resubmit step (`202610290002_safety_rework_resubmit.sql`).
+- **Request Changes** names the arrangement kinds to redo (venue, equipment, other); every live venue booking request or equipment request of a named kind goes back to Venue Staff or Technical Support (`safety_rereviews`), and the event waits in Planning with `safety_*_recheck` keys until each is confirmed again and the coordinator settles the rest (`202610240001_safety_changes_requested.sql`). Rework of a Safety Rejected event leaves an explicit resubmit step (`202610290002_safety_rework_resubmit.sql`).
 
 **Consequences.** The rule holds whichever client calls; the cost is that the TypeScript readiness mirror (`arrangementReadiness.ts`) and the SQL must change together (ADR-03).
 
@@ -309,7 +311,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
 | Artefact | What changed |
 |---|---|
-| C4 (`connectsphere.dsl`) | The C3 API components gain a venue-operations router and a clashes router. Supabase gains the `venue_preparation_gap` function and the clash-refresh triggers. |
+| C4 (`connectsphere.dsl`) | The C3 API components gain a venue-operations router and a clashes router. The database-internal `venue_preparation_gap` function (`202610120002`) and the clash-refresh triggers are not drawn. |
 | Class (`class-diagram.puml`) | Venue gains setup, turnaround and safety attributes, from table `venue_operations`. New class BookingClash. |
 | Data model (`data-model.puml`) | New tables: `venue_operations` and `venue_operation_history` (`202610050003`), `venue_booking_clashes` (`202610140003`). |
 | Sequence (`sequence-diagrams.puml`) | Diagram 1 shows availability, then the booking decision with the gap applied, then clash flags. |
@@ -323,7 +325,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 - Those bookings are flagged as affected and retained. Since SG2-81, each new flag notifies the current Coordinator; Preparation/Confirmed events return to Planning, clear confirmation stamps, record history and notify the Organiser. Date, time, attendance and requirements remain unchanged; other stages stay unchanged.
 - An assigned Coordinator requests a replacement through the existing booking-request POST with `replaces_booking_id`. The reference must identify an affected confirmed booking of that event. Pending replacements reserve nothing.
 - Venue Staff approval atomically creates the new confirmed booking, releases the original booking/cancels its request, updates the primary booking pointer and writes history/notices. Failure rolls back. Rejection leaves the old booking intact.
-- `202610170002` is the final confirmation RPC: affected bookings and persisted venue/equipment/registration rechecks both prevent confirmation. Other ready arrangements do not erase a recheck flag.
+- `confirm_event` is the final confirmation RPC (latest definition `202610290001`; `202610170002` first added these gates): affected bookings and persisted venue/equipment/registration rechecks both prevent confirmation. Other ready arrangements do not erase a recheck flag.
 
 **Why** (`202610100001_venue_temporary_unavailability.sql`): the venue may genuinely be unusable. The old refusal (SG2-45 AC2) made it impossible to record that.
 

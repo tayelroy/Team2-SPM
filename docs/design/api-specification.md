@@ -113,7 +113,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 32 | PUT | `/api/venues/:venueId` | `venues.update` | VS | — | [6.3](#63-put-apivenuesvenueid) |
 | 33 | GET | `/api/venues/:venueId/layouts` | `venues.layouts.read` | VS, EC | — | [6.4](#64-get-apivenuesvenueidlayouts) |
 | 34 | PUT | `/api/venues/:venueId/layouts` | `venues.layouts.update` | VS | — | [6.5](#65-put-apivenuesvenueidlayouts) |
-| 35 | GET | `/api/venues/:venueId/operations` | `venues.operations.read` | VS, EC, TSS | W7 #1/#6 — SG2-77 | [6.6](#66-get-apivenuesvenueidoperations) |
+| 35 | GET | `/api/venues/:venueId/operations` | `venues.operations.read` | VS, EC, TSS, SO | W7 #1/#6 — SG2-77 | [6.6](#66-get-apivenuesvenueidoperations) |
 | 36 | PUT | `/api/venues/:venueId/operations` | `venues.operations.update` | VS | W7 #1/#6 — SG2-77 | [6.7](#67-put-apivenuesvenueidoperations) |
 | 37 | GET | `/api/venues/availability` | `venues.availability.view` | EC, VS, TSS | W7 #1 — SG2-78; W7 #2 — SG2-80 | [6.8](#68-get-apivenuesavailability) |
 | 38 | GET | `/api/venues/:venueId/availability` | `venues.availability.view` | EC, VS, TSS | W7 #1 — SG2-78; W7 #2 — SG2-80 | [6.9](#69-get-apivenuesvenueidavailability) |
@@ -194,6 +194,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
   - rows 24 and 25 (stage, history)
   - rows 63 and 69 (equipment requirements and reservations, read-only)
   - rows 85 and 86 (record and read safety decisions) and row 89 (the safety check list)
+  - row 35 (venue operations and safety details, read-only; SG2-77 AC5)
   - rows 100 and 101 (event search)
   - the inbox (rows 92, 93, 96, 97), profile and me
   - it does not hold `notifications.read` (row 29)
@@ -252,12 +253,12 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
   - 404 `No account with that id.`
   - 409 `An account must keep at least one role.`
   - 503 `Service temporarily unavailable. Please try again later.` / `Could not update the role. Please try again later.`
-- **Data:** updates `account_roles` through the service-role client. `userId` is not format-checked.
+- **Data:** RPC `change_account_roles(p_actor_id, p_target_id, 'replace', p_role)`, executable by `service_role` only (`db/accountRoles.ts`, `202610180001_account_multi_roles.sql`). `replace` leaves the account holding exactly the given role. `userId` is not format-checked by the handler; a non-UUID id fails in Postgres (`22P02`) and is returned as 404 `No account with that id.`
 
 ### 3.5 GET /api/profile
 - **Source:** `app.ts:273`; `profile/index.ts:89`.
 - **Permission:** `profile.read` (all 7 roles).
-- **200:** `{ profile: { user_id, name, organisation, phone, communication_preferences, department } }`. `department` is omitted for the external roles (EO, ATT); see `INTERNAL_ROLES` in `policy.ts`.
+- **200:** `{ profile: { user_id, name, organisation, phone, communication_preferences, department }, roles[] }`. `roles` is every role the account holds, in display form (SG2-104 AC3). `department` is omitted unless the account holds an internal role (any held role, not only the acting one; see `INTERNAL_ROLES` in `policy.ts`).
 - **Errors:**
   - 409 `Your account is not fully set up yet. Please contact support.` (no `users` row)
   - 503 `Your profile is temporarily unavailable. Please try again later.`
@@ -270,8 +271,8 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
   - `name`: required, at most 200 characters.
   - `phone`: optional; a Singapore number, `^(?:\+65)?[0-9]{8}$` once separators are stripped.
   - `communication_preferences`: optional; a subset of `email`, `sms`, `phone_call`.
-  - `department`: optional, at most 150 characters; internal roles only, ignored for EO and ATT.
-- **200:** `{ profile }`, the same shape as GET.
+  - `department`: optional, at most 150 characters; ignored unless the account holds an internal role.
+- **200:** `{ profile, roles[] }`, the same shape as GET.
 - **Errors:**
   - 400 `{ error: "Invalid profile details", details: string[] }`
   - 409 not set up
@@ -296,7 +297,8 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **DetailRecord:** DraftRecord plus:
   - assignment: `coordinator_id, coordinator_name`
   - decision and completion: `decided_at, decision_reason, completed_by, completed_at`
-  - `ends_at` (latest confirmed booking end)
+  - cancellation: `cancellation_requested_at, cancellation_reason, cancelled_at`
+  - `ends_at` (latest confirmed booking end; mapped by list and `complete` responses, not by 4.3)
 
 ### 4.1 POST /api/event-requests
 - **Source:** `app.ts:160`; `events/createDraft.ts`.
@@ -329,8 +331,8 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Source:** `app.ts:258`; `events/list.ts`.
 - **Permission:** `event_request.view` (EO).
 - **200:** `{ request }`. The record carries:
-  - DetailRecord columns, plus `coordinator_phone` and `can_manage`
-  - the raw embeds `coordinator { name, phone }` and `venue_bookings [{ ends_at, status }]`
+  - the DetailRecord columns except the mapped `ends_at`, plus `coordinator_phone` and `can_manage`
+  - the raw embeds `coordinator { name, phone }` and `venue_bookings [{ ends_at, status }]` (the client derives the end from these)
 - **Errors:** 404 `No event request found for this account.`; 503.
 - **Rule:** any EO in the same organisation can read it.
 
@@ -342,7 +344,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
   - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
-  - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
+  - 409 `Only a draft can be edited. Ask for a change to a submitted request through a change request.` if the status is not `draft`, including a change after the initial lookup. A `needs_clarification` request is changed through a change request (SG2-64 AC5), so the handler refuses it before the RPC is called.
   - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
 - **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the eleven fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105; `category` by `202610200005_event_search.sql`, SG2-70, which also refuses a category outside the list). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
 - **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
@@ -395,12 +397,12 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Body:** `{ coordinatorId: string }`
 - **200:** `{ request: DetailRecord }`. If `coordinatorId` already holds the event, the call writes nothing and returns 200.
 - **Errors:**
-  - 400 `coordinatorId is required.` / `No account exists with the given coordinatorId.` / `coordinatorId must belong to an Event Coordinator account.`
+  - 400 `coordinatorId is required.` / `No account exists with the given coordinatorId.` / `coordinatorId must belong to an Event Coordinator account.` / `An event's organiser cannot be its coordinator.` (SG2-104 separation of duties)
   - 404 `No event request found with that id.`
   - 409 `A coordinator can only be assigned to a submitted request that is not yet closed out.`
   - 409 `This request changed while you were assigning it. Reload the list and try again.`
   - 503
-- **Rule:** this is both **assign and reassign**. Assignable statuses are `unassigned`, `submitted`, `under_review`, `approved`, `planning`, `awaiting_safety_check`, `safety_rejected`, `preparation` and `confirmed`. The first assignment moves the status `unassigned → submitted`; a reassignment leaves the status alone. The update is guarded on the expected current `coordinator_id`.
+- **Rule:** this is both **assign and reassign**. Assignable statuses are `unassigned`, `submitted`, `under_review`, `needs_clarification`, `approved`, `planning`, `awaiting_safety_check`, `safety_rejected`, `preparation` and `confirmed`. The first assignment moves the status `unassigned → submitted`; a reassignment leaves the status alone. The update is guarded on the expected current `coordinator_id`.
 - **Side effects:**
   - history rows: `coordinator_id`, plus the status row on a first assignment
   - `coordinator_assigned` notices to the new coordinator, the organiser and the previous coordinator; the actor is excluded
@@ -456,7 +458,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - `venue_requirements`, `equipment_requirements`, `accessibility_needs`, `planning_notes`
   - `registration_needed`
   - `confirm_impact`
-- **SG2-63 AC8:** `registration_capacity`, `registration_opens_at` and `registration_closes_at` are the organiser's (§4.13a); a body carrying any of them is refused 403 `{ error: "Registration capacity and opening and closing times are set by the Event Organiser.", fields[] }` before anything is read.
+- **SG2-63 AC8:** `registration_capacity`, `registration_opens_at`, `registration_closes_at` and `waiting_list_response_hours` are the organiser's (§4.13a); a body carrying any of them is refused 403 `{ error: "Registration capacity and opening and closing times are set by the Event Organiser.", fields[] }` before anything is read.
 - **Schedule rules:**
   - a changed date must be in the future
   - the stored registration opening and closing times must still be before the event
@@ -477,13 +479,13 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 ### 4.13a SG2-63 registration picture and settings
 - **Source:** `events/registrationRoutes.ts`, `events/registrationSettings.ts`, `db/registrations.ts`; migration `202610200004_event_registration_settings.sql`. See [Registrations](../registrations.md).
 - **GET /api/event-requests/:eventId/registrations** — permission `event_request.registrations.view` (EO, EC). An organiser of the event's organisation or its assigned coordinator; anyone else gets 404.
-  - **200:** `{ event_id, name, status, registration_needed, registration_capacity, registration_opens_at, registration_closes_at, window, registered_count, places_remaining, contact_details_visible, attendees[], venues[], capacity_warnings[], can_edit }`. `window` is SG2-58's `not_required | not_confirmed | not_yet_open | open | closed`. Each attendee has `registration_id, name, organisation, registered_at`, plus `email` and `phone` only when `contact_details_visible` (the creating organiser and the assigned coordinator).
-- **PATCH /api/event-requests/:eventId/registration-settings** — permission `event_request.registration_settings.update` (EO); the creating organiser only (403 otherwise).
-  - **Body:** any of `registration_capacity` (1–2147483647 or null), `registration_opens_at`, `registration_closes_at` (ISO date-time or null). Nothing else.
-  - **Rules:** closes after it opens; a new closing time is in the future; both before the event starts; capacity not below the registrations already held; none of the three cleared once the event is confirmed; allowed in any status but completed, cancelled or rejected, and only before the event starts. A capacity above a booked venue is allowed and returned in `capacity_warnings`.
+  - **200:** `{ event_id, name, status, registration_needed, registration_capacity, registration_opens_at, registration_closes_at, waiting_list_response_hours, window, registered_count, places_remaining, contact_details_visible, attendees[], waiting_list[], venues[], capacity_warnings[], can_edit }`. `window` is SG2-58's `not_required | not_confirmed | not_yet_open | open | closed`. Each attendee has `registration_id, name, organisation, registered_at`, plus `email`, `phone` and `needs` only when `contact_details_visible` (the creating organiser and the assigned coordinator). Waiting-list entries carry a `position`, numbered from 1 for those still waiting and null otherwise (SG2-61 AC7).
+- **PATCH /api/event-requests/:eventId/registration-settings** — permission `event_request.registration_settings.update` (EO); the creating organiser only. Another organiser of the same organisation gets 403; anyone else gets 404 `Event not found.`
+  - **Body:** any of `registration_capacity` (1–2147483647 or null), `registration_opens_at`, `registration_closes_at` (ISO date-time or null), `waiting_list_response_hours` (whole hours, 1–168; ADR-10). Nothing else.
+  - **Rules:** closes after it opens; a new closing time is in the future; both before the event starts; capacity not below the registrations already held (400 in `details`); none of the three cleared once the event is confirmed; allowed in any status but completed, cancelled or rejected, and only before the event starts. A capacity above a booked venue is allowed and returned in `capacity_warnings`.
   - **200:** the registration picture as it now stands.
-- **POST /api/event-requests/:eventId/registration-settings/close** — same permission; closes open registration now.
-- **Errors:** 400 `{ error: "Invalid registration settings", details[] }`; 403; 404 `Event not found.`; 409 for a closed event (`status`), no registration, an event that has started, closing registration that is not open, or a registration arriving between the check and the write (`registered`); 503.
+- **POST /api/event-requests/:eventId/registration-settings/close** — same permission and owner rule; closes open registration now.
+- **Errors:** 400 `{ error: "Invalid registration settings", details[] }`; 403 (same-organisation organiser who did not create the event); 404 `Event not found.`; 409 for a closed event (`status`), no registration, an event that has started, closing registration that is not open, or a registration arriving between the check and the write (`registered`); 503 `Registrations are temporarily unavailable…`.
 - **Side effects:** one `event_audit_logs` row per changed setting; a `registration_opened` or `registration_closed` notice to the organiser and the assigned coordinator when a confirmed event's registration opens or closes, including on schedule (`process_registration_windows()`, every minute through pg_cron).
 
 ### 4.14 GET /api/event-requests/:eventId/arrangements
@@ -508,7 +510,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `{ error: "Only an event in Preparation can be confirmed.", code: "closed" }`
   - 409 `{ error: "Confirmation refused: arrangements are still outstanding.", code: "outstanding", outstanding[] }`
   - 401/403/503 mapped from the RPC
-- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610220001_safety_approval_gate.sql` (SG2-94). Under `for update` the RPC:
+- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The safety gate came in `202610220001_safety_approval_gate.sql` (SG2-94); the latest definition is `202610290001_requested_equipment_outstanding.sql`, which also counts equipment the organiser asked for (anything but `None`) with no live equipment request as outstanding `equipment` (SG2-57; mirrored in `arrangementReadiness.ts`). Under `for update` the RPC:
   - rechecks the caller's role and assignment
   - answers an event in `approved`, `planning`, `awaiting_safety_check` or `safety_rejected` with `outstanding` (the safety check included) and any other status but `preparation` with `closed`
   - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment needs, persisted venue/equipment/registration rechecks and a missing safety approval (`safety`, SG2-94 AC5); unset registration settings no longer block (AC6); refusal changes no event, booking, receipt, history or notification
@@ -541,10 +543,10 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Permission:** `event_request.stage.view` (EO, EC, VS, TSS, ECL, SO).
 - **200:** `{ event_id, raw_status, stage, stage_key, description, waiting_on, stepper_steps: [{ key, label, status }], arrangements_recheck_needed, outstanding_arrangements[] }`. The 7 stepper keys are `draft`, `unassigned`, `under_review`, `in_planning`, `safety_check`, `preparation` and `confirmed`.
 - **Errors:**
-  - 403 `You are not authorized to view the stage of this event.` (an EO who is not the creator)
+  - 403 `You are not authorized to view the stage of this event.` (a caller with no relationship to the event; see Rule)
   - 404 `Event not found.`
   - 503
-- **Rule:** an EO sees only their own events; every other granted role sees any event.
+- **Rule:** every role must relate to the event (`events/eventRelationship.ts`, mirrored by `private.event_relationship_exists()`): EO its creator; EC its current coordinator; ECL any event but a `draft`; SO events in `awaiting_safety_check`, `safety_rejected`, `preparation`, `confirmed` or `completed`; VS events with a venue request or booking; TSS events with an equipment request or reservation.
 
 ### 4.19 GET /api/event-requests/:eventId/history
 - **Week 7:** #5/#6 — SG2-97, SG2-100.
@@ -555,7 +557,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 403 `You are not authorized to view the change history of this event.`
   - 404 `Event not found.`
   - 503
-- **Rule:** an EO sees only their own events, and never `planning_notes` rows (`INTERNAL_ONLY_AUDIT_FIELDS`).
+- **Rule:** the same relationship rule as 4.18; an EO also never sees `planning_notes` rows (`INTERNAL_ONLY_AUDIT_FIELDS`).
 
 ### 4.20 POST /api/event-requests/:eventId/cancellation-request
 - **Week 7:** Sprint 4 — SG2-67.
@@ -705,11 +707,12 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Week 7:** #5 — SG2-87.
 - **Source:** `app.ts:149`; `assignmentQueue/index.ts`.
 - **Permission:** `event_request.queue.view` (ECL).
-- **200:** `{ entries: [{ event_id, name, organiser_name, proposed_date, expected_attendance, submitted_at }] }`
+- **200:** `{ entries: [{ event_id, name, organiser_name, proposed_date, expected_attendance, submitted_at }], coordinators: [{ user_id, name }] }`
+  - `coordinators` are the Event Coordinators the Lead can pick, sorted by name (SG2-88 AC1; read from `account_roles` and `users`).
   - Covers events with status `unassigned` and no coordinator, across every organisation.
   - Oldest `submitted_at` first.
-- **Errors:** 503 `The assignment queue is temporarily unavailable. Please try again.`
-- **Data:** `events` joined to `users`, through the service-role client.
+- **Errors:** 503 `The assignment queue is temporarily unavailable. Please try again.` (also when the coordinator list cannot be read)
+- **Data:** `events` joined to `users`, plus `account_roles` and `users` for the coordinator list (`db/accountRoles.ts`, `listCoordinators`), through the service-role client.
 
 ### 5.2 GET /api/work-queue and GET /api/work-queue/:kind/:itemId
 - **Week 7:** #5 — SG2-87.
@@ -738,7 +741,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Week 7:** #5 — SG2-89.
 - **Source:** `app.ts:189`; `coordinatorOverview/index.ts`; `db/coordinatorOverview.ts`.
 - **Permission:** `event_request.oversight.view` (ECL).
-- **Query:** `coordinatorId` and `status`, each optional and at most once (400 `Give <key> at most once.`). `status` must be an active event status (400 `status must be the status of an active event.`); `coordinatorId` must be an Event Coordinator in the roster (400 `coordinatorId must be an Event Coordinator.`).
+- **Query:** `coordinatorId` and `status`, each optional and at most once (400 `Give <key> at most once.`). `status` must be an active event status (400 `status must be the status of an active event.`); `coordinatorId` must be a coordinator in the workload roster, which includes former coordinators still holding the caller's events (400 `coordinatorId must be an Event Coordinator.`, checked after the reads, so a 503 can come first).
 - **200:** `{ events: [{ event_id, name, organisation, status, proposed_date, coordinator_id, coordinator_name }], coordinators: [{ user_id, name, active_events, assignable }], statuses[] }`.
   - `events` are the active events whose coordinator the caller last assigned or reassigned (`events.coordinator_assigned_by`), soonest first, in every assignable status except `unassigned`.
   - `coordinators` lists every Event Coordinator with how many of the caller's active events they hold, counted before the filters apply; a former coordinator still holding events appears with `assignable: false`.
@@ -875,7 +878,7 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
 ### 6.6 GET /api/venues/:venueId/operations
 - **Week 7:** #1/#6 — SG2-77.
 - **Source:** `venues/operations.ts:50`.
-- **Permission:** `venues.operations.read` (VS, EC, TSS).
+- **Permission:** `venues.operations.read` (VS, EC, TSS, SO). The Safety Officer reads venue safety details for the check (SG2-77 AC5, `202610160002_safety_officer_reads_venue_operations.sql`); the venue-exists check for this read uses RPC `venue_exists_for_operations_read` (`202610170005_venue_operations_read_identity.sql`).
 - **200:** `{ operations: { setup_minutes, turnaround_minutes, emergency_access, known_restrictions, updated_at } }`. With no saved row the defaults are 0, 0, null, null, null.
 - **Errors:** 400 `Invalid venue ID.`; 404 `Venue not found.`
 - **Data:** `venue_operations`.
@@ -1060,7 +1063,8 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Approve a capacity exception for this request before approving the booking.`
   - 409 `closed`
   - 409 `{ error, conflict: { kind: "booking"|"block"|"hold", starts_at, ends_at, label } }`
-- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610190002_venue_staff_capacity_exceptions.sql`: only a capacity exception recorded by Venue Staff covers the attendance (SG2-66 AC5). The API applies the same rule before calling it.
+  - 403 `You raised this request yourself, so another Venue Staff member must decide it.` (`own_request`, SG2-104 separation of duties)
+- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610200002_acting_role_functions.sql`: it locks the acting `venue_staff` role, refuses a request the caller raised (`own_request`), and keeps the rule from `202610190002_venue_staff_capacity_exceptions.sql` that only a capacity exception recorded by Venue Staff covers the attendance (SG2-66 AC5). The API applies the capacity rule before calling it.
 - **What the RPC does:**
   - Under the venue lock it refuses confirmed bookings and live holds within the setup + turnaround gap (`venue_preparation_gap`, SG2-78), and unavailability without the gap.
   - It inserts a confirmed `venue_bookings` row and keeps the event's first booking (`events.venue_booking_id = coalesce(...)`, SG2-82).
@@ -1161,7 +1165,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 400 `Choose a planning event with an assigned coordinator, a valid period and a future expiry.`
   - 404 `Event, venue or tentative hold not found.`
   - 409 `This venue is already booked, held or unavailable for that period.`
-- **Data:** RPC `create_venue_hold(...)`. The latest definition is in `202610120002_setup_turnaround_checks.sql`. The RPC:
+- **Data:** RPC `create_venue_hold(...)`. The latest definition is in `202610190004_safety_check_queue.sql` (earlier `202610120002` added the gap and `202610170007` refused deleted venues); it accepts events in `approved`, `planning` or `awaiting_safety_check` with a coordinator. The RPC:
   - inserts a pending `venue_booking_requests` row and the `venue_holds` row
   - writes history
   - sends a `placed` notice, plus a `warning` at once if the hold is already inside the lead time
@@ -1309,7 +1313,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 404
   - 409 `This event or request is no longer being arranged. Refresh before continuing.`
   - 409 `This equipment already has a pending request for the event.`
-- **Rule:** only the assigned EC; the event must be `approved` or `planning`.
+- **Rule:** only the assigned EC; the event must be `approved`, `planning` or `awaiting_safety_check` (`202610290003_equipment_placement_event_venues.sql`).
 - **Data:** RPC `manage_equipment_requirements('create', …)`.
 
 ### 9.6 PATCH /api/equipment-requests/:requestId
@@ -1330,7 +1334,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Permission:** `equipment_requirements.arrange` (TSS).
 - **Body:**
   - `event_id`, `version`
-  - `shortfall`: 0 or more
+  - `shortfall`: 0 up to the request's quantity (otherwise RPC `invalid`, 400)
   - `arrangement_notes`: optional
   - `placement_venue_id` and `placement_position`: either both set or both null; the venue must be one the event has requested (pending or approved) or booked (confirmed)
 - **200:** RequirementsView.
@@ -1360,13 +1364,13 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Body:** only `event_id`, `version`, `starts_at` and `ends_at`; the times are ISO strings with a time zone.
 - **Start time:** `starts_at` must be in the future, otherwise 400 `Choose a reservation start in the future.` (the RPC also enforces it, `202610310001_equipment_reservation_future_start.sql`).
 - **201:** `{ can_reserve, reservations[], coordinator_notified: true }`
-- **Errors:** `{ error, code }`, where `code` is one of:
+- **Errors:** the handler's own 400s are `{ error }` only (`Send only the event, request version and reservation period.`, `Choose a valid event.`, `Refresh a valid equipment request before reserving.`, the period message and the future-start message). RPC refusals are `{ error, code }`, where `code` is one of:
   - 400 `invalid`
   - 404 `missing`
   - 409 `closed`
   - 409 `conflict`
   - 409 `insufficient`: `There is not enough operational equipment available for this period. Refresh availability before trying again.`
-- **Data:** RPC `manage_equipment_reservations('reserve', …)` (`202610140001_equipment_reservations.sql`). Under a lock, the RPC:
+- **Data:** RPC `manage_equipment_reservations('reserve', …)` (`202610140001_equipment_reservations.sql`; latest definition `202610310001_equipment_reservation_future_start.sql`). Under a lock, the RPC:
   - inserts into `equipment_reservations`
   - sets the request to `approved`
   - sends an `equipment_reserved` notice to the coordinator
@@ -1377,7 +1381,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Permission:** `requireAuth` + `equipment_requirements.read` (EC, TSS, SO).
 - **Query:** `event_id` (required); no other keys are allowed.
 - **200:** `{ can_reserve, reservations: [{ reservation_id, event_id, request_id, equipment_id, equipment_type, quantity_reserved, starts_at, ends_at, reserved_at }] }`
-- **Errors:** 400 `Choose a valid event.`; 404 / 400 `{ error, code }`.
+- **Errors:** 400 `Choose a valid event.` (`{ error }` only); RPC refusals 404 / 400 `{ error, code }`.
 - **Data:** RPC `manage_equipment_reservations('read', …)`.
 
 ---
