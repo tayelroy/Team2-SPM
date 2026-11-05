@@ -198,6 +198,28 @@ one independently proves an acceptance criterion.
 
 ### Hosted verification of the eight pending cases
 
+#### Re-run on 5 November 2026
+
+- **CI-REG-01:** [Draft PR #132](https://github.com/tayelroy/Team2-SPM/pull/132) added only a dated evidence README for its
+  [baseline](https://github.com/tayelroy/Team2-SPM/actions/runs/42028666380). All eight CI jobs passed. Changing one expected text in
+  Playwright made the [browser and aggregate checks fail](https://github.com/tayelroy/Team2-SPM/actions/runs/42029747787) while the
+  six other CI jobs passed. GitHub marked the failed aggregate Required and disabled
+  merging. The PR was also a draft and required an approving review.
+  [PR merge box](evidence/ci-reg/pr-132-merge-box.jpg).
+  [Reverting the assertion](https://github.com/tayelroy/Team2-SPM/actions/runs/42031006879) restored all eight checks to green.
+  The uploaded browser-regression artifact contained `playwright-report/index.html`.
+- **CI-REG-02:** The job condition logs for PR #132 recorded
+  [opened](https://github.com/tayelroy/Team2-SPM/actions/runs/42028666380) and [synchronize](https://github.com/tayelroy/Team2-SPM/actions/runs/42029747787).
+  The two most recent merges into main each triggered a successful closed-event CI run.
+  Every checkout in [PR #131’s run](https://github.com/tayelroy/Team2-SPM/actions/runs/42030556106) used
+  `d9823cf0d52cbef50ca2835bc08c5982bbfe2d71`. Every checkout in
+  [PR #130’s run](https://github.com/tayelroy/Team2-SPM/actions/runs/41585850175) used
+  `41e9573e8b893969f9a8b37330c25482612ba579`. Both matched the respective PR API
+  `merge_commit_sha` exactly. [Closing #132 without merging](https://github.com/tayelroy/Team2-SPM/actions/runs/42032121261)
+  skipped every job, with the application matrix skipped before expansion. No job failed.
+
+#### Earlier runs in September 2026
+
 - **DB-ROLE-01–05 and CI-REG-01:** [PR #19 CI run](https://github.com/tayelroy/Team2-SPM/actions/runs/34856027583)
   tested head `cfa6b8a60961` through merge revision `68b92e87bfb9`. All six CI
   checks passed: 183 backend, 141 frontend and 19 reviewer tests, 100% application
