@@ -34,7 +34,7 @@ test('SG2-59-P01 | [NORMAL] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] an attendee f
   const cards = list.getByRole('article');
   await expect(cards).toHaveCount(2);
   await expect(cards.nth(0)).toHaveAccessibleName('Bayfront Workshop');
-  await expect(cards.nth(0)).toContainText('Opening soon');
+  await expect(cards.nth(0)).toContainText('Controlled CI-REG-01 failure');
   await expect(cards.nth(0)).toContainText('RegistrationOpens 1 Jun 2030, 8:00 am');
   await expect(cards.nth(0)).toContainText('VenueTo be announced');
   const lecture = cards.nth(1);
